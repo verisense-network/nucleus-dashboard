@@ -28,13 +28,13 @@ const alovaInstance = createAlova({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001',
   requestAdapter: adapterFetch(),
   responded: (response) => response.json(),
-  cacheLogger: true,
+  cacheLogger: false,
   l1Cache: createPSCAdapter(
     NodeSyncAdapter(),
     lRUCache({
       max: 1000,
-      ttl: 1000 * 60 * 10
-    })
+      ttl: 1000 * 60 * 10,
+    }),
   )
 });
 

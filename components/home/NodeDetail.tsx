@@ -14,6 +14,7 @@ export default async function NodeDetail() {
       <div className="w-full">
         <Card>
           <CardBody>
+            <p>rpc url: {process.env.NEXT_PUBLIC_API_URL}</p>
             <p className="text-danger">Load node detail failed: {result.message || "Unknown error"}</p>
           </CardBody>
         </Card>
@@ -21,7 +22,7 @@ export default async function NodeDetail() {
     );
   }
 
-  const { node_info, network_stats, endpoint, timestamp } = result.data;
+  const { node_info, network_stats, endpoint } = result.data;
 
   const nodeDetails = [
     {
@@ -54,12 +55,6 @@ export default async function NodeDetail() {
       name: "Endpoint",
       render: () => (
         <span>{endpoint}</span>
-      ),
-    },
-    {
-      name: "Last Updated",
-      render: () => (
-        <TooltipTime time={timestamp} />
       ),
     },
   ]

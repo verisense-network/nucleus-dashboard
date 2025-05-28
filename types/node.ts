@@ -18,5 +18,4 @@ export interface NodeDetail {
   node_info: NodeInfo;
   network_stats: NetworkStats;
   endpoint: string;
-  timestamp: number;
 } 
