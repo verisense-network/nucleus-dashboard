@@ -5,7 +5,6 @@ import { HeroUIProvider } from "@heroui/react";
 import { ToastContainer } from "react-toastify";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { useRouter } from "next/navigation";
-import RainbowProvider from "@/lib/rainbow";
 import TourProvider from "@/lib/tour";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -22,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           }}
         >
           <TourProvider>
-            <RainbowProvider>{children}</RainbowProvider>
+            {children}
           </TourProvider>
         </SWRConfig>
       </NextThemesProvider>
