@@ -437,8 +437,8 @@ function generateGenericTypeAlias(alias: TypeAliasEntry, entries: AbiEntry[]): s
     const okType = alias.target.generic_args[0];
     const errType = alias.target.generic_args[1];
     
-    let okTypeStr: string;
-    let errTypeStr: string;
+    let okTypeStr: string = '';
+    let errTypeStr: string = '';
     
     if (okType?.kind === "Path" && okType?.path && okType?.path[0]) {
       const okTypeName = okType.path[0];
