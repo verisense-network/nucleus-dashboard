@@ -2,7 +2,6 @@ import { getNodeDetail } from "@/app/actions";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import { Divider } from "@heroui/divider";
-import TooltipTime from "../formatTime/TooltipTime";
 import { NetworkStats, NodeInfo } from "@/types/node";
 import { formatReadableAmount } from "@/utils/format";
 
@@ -22,33 +21,33 @@ export default async function NodeDetail() {
     );
   }
 
-  const { node_info, network_stats, endpoint } = result.data;
+  const { nodeInfo, networkStats, endpoint } = result.data;
 
   const nodeDetails = [
     {
       name: "Spec Name",
-      render: (node_info: NodeInfo) => (
+      render: (nodeInfo: NodeInfo) => (
         <Chip size="sm" variant="flat" color="primary">
-          {node_info.spec_name}
+          {nodeInfo.specName}
         </Chip>
       ),
     },
     {
       name: "Spec Version",
-      render: (node_info: NodeInfo) => (
-        <span>{node_info.spec_version}</span>
+      render: (nodeInfo: NodeInfo) => (
+        <span>{nodeInfo.specVersion}</span>
       ),
     },
     {
       name: "Best Block",
-      render: (node_info: NodeInfo) => (
-        <span>{node_info.best_block.toLocaleString()}</span>
+      render: (nodeInfo: NodeInfo) => (
+        <span>{nodeInfo.bestNumber.toLocaleString()}</span>
       ),
     },
     {
       name: "Finalized Block",
-      render: (node_info: NodeInfo) => (
-        <span>{node_info.finalized_block.toLocaleString()}</span>
+      render: (nodeInfo: NodeInfo) => (
+        <span>{nodeInfo.finalizedNumber.toLocaleString()}</span>
       ),
     },
     {
@@ -62,42 +61,34 @@ export default async function NodeDetail() {
   const networkDetails = [
     {
       name: "Total Accounts",
-      render: (network_stats: NetworkStats) => (
-        <span>{network_stats.total_accounts.toLocaleString()}</span>
+      render: (networkStats: NetworkStats) => (
+        <span>{networkStats.totalAccounts.toLocaleString()}</span>
       ),
     },
     {
       name: "Total Nucleus",
-      render: (network_stats: NetworkStats) => (
-        <span>{network_stats.total_nucleus.toLocaleString()}</span>
+      render: (networkStats: NetworkStats) => (
+        <span>{networkStats.totalNucleus.toLocaleString()}</span>
       ),
     },
     {
       name: "Total Validators",
-      render: (network_stats: NetworkStats) => (
-        <span>{network_stats.total_validators.toLocaleString()}</span>
+      render: (networkStats: NetworkStats) => (
+        <span>{networkStats.totalValidators.toLocaleString()}</span>
       ),
     },
     {   
       name: "Active Validators",
-      render: (network_stats: NetworkStats) => (
+      render: (networkStats: NetworkStats) => (
         <Chip size="sm" variant="flat" color="success">
-          {network_stats.active_validators.toLocaleString()}
+          {networkStats.totalValidators.toLocaleString()}
         </Chip>
       ),
     },  
     {
       name: "Total Issuance",
-      render: (network_stats: NetworkStats) => (
-        <span>{formatReadableAmount(network_stats.total_issuance, 0)}</span>
-      ),
-    },
-    {
-      name: "Staking Ratio",
-      render: (network_stats: NetworkStats) => (
-        <Chip size="sm" variant="flat" color="warning">
-          {(network_stats.staking_ratio * 100).toFixed(2)}%
-        </Chip>
+      render: (networkStats: NetworkStats) => (
+        <span>{formatReadableAmount(networkStats.totalIssuance, 0)}</span>
       ),
     },
   ]
@@ -116,7 +107,7 @@ export default async function NodeDetail() {
               {nodeDetails.map((detail) => (
                 <div className="flex justify-between items-center" key={detail.name}>
                   <span className="text-default-500">{detail.name}:</span>
-                  <span>{detail.render(node_info)}</span>
+                  <span>{detail.render(nodeInfo)}</span>
                 </div>
               ))}
             </div>
@@ -132,7 +123,7 @@ export default async function NodeDetail() {
               {networkDetails.map((detail) => (
                 <div className="flex justify-between items-center" key={detail.name}>
                   <span className="text-default-500">{detail.name}:</span>
-                  <span>{detail.render(network_stats)}</span>
+                  <span>{detail.render(networkStats)}</span>
                 </div>
               ))}
             </div>

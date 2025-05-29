@@ -12,6 +12,7 @@ interface NucleusCardProps {
 }
 
 export default function NucleusCard({ nucleus, showLink = true }: NucleusCardProps) {
+  console.log("nucleus", nucleus);
   const details = [
     {
       name: "Manager",
@@ -34,19 +35,19 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
     {
       name: "Current Event",
       render: (nucleus: NucleusInfo) => (
-        <span>{nucleus.current_event}</span>
+        <span>{nucleus.currentEvent}</span>
       ),
     },
     {
       name: "WASM Hash",
       render: (nucleus: NucleusInfo) => (
-        <AddressViewFormat address={nucleus.wasm_hash} bracket={false} />
+        <AddressViewFormat address={nucleus.wasmHash} bracket={false} />
       ),
     },
     {
       name: "Location",
       render: (nucleus: NucleusInfo) => (
-        <AddressViewFormat address={nucleus.wasm_location} bracket={false} />
+        nucleus.wasmLocation ? <AddressViewFormat address={nucleus.wasmLocation} bracket={false} /> : "-"
       ),
     },
   ];
@@ -69,7 +70,7 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
         </div>
         <div className="flex flex-col items-end gap-2">
           <Chip size="sm" variant="flat" color="primary">
-            Version: {nucleus.wasm_version}
+            Version: {nucleus.wasmVersion}
           </Chip>
         </div>
       </CardHeader>

@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: NucleusDetailPageProps): Prom
   const { nucleusId } = await params;
   
   const result = await getNucleusDetail(nucleusId);
-  
+
   if (!result.success || !result.data) {
     return {
       title: "Nucleus Not Found",
@@ -98,7 +98,7 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">Root State</h3>
-                  <p className="text-sm font-mono break-all">{nucleus.root_state}</p>
+                  <p className="text-sm font-mono break-all">{nucleus.rootState}</p>
                 </div>
                 
                 <div>
@@ -110,7 +110,7 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">WASM Hash</h3>
-                  <p className="text-sm font-mono break-all">{nucleus.wasm_hash}</p>
+                  <p className="text-sm font-mono break-all">{nucleus.wasmHash}</p>
                 </div>
                 
                 <div>

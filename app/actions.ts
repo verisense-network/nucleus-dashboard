@@ -1,6 +1,6 @@
 "use server";
 
-import { getNucleusListAPI, getNucleusDetailAPI, getNucleusAbiAPI } from "@/api/nucleus";
+import { getNucleusListAPI, getNucleusByIdAPI, getNucleusAbiAPI } from "@/api/nucleus";
 import { getNodeDetailAPI } from "@/api/node";
 import { NucleusListResponse, NucleusInfo } from "@/types/nucleus";
 import { NodeDetail } from "@/types/node";
@@ -28,7 +28,7 @@ export async function getNucleusDetail(id: string): Promise<{
   message?: string;
 }> {
   try {
-    const data = await getNucleusDetailAPI(id);
+    const data = await getNucleusByIdAPI(id);
     
     return {
       success: true,

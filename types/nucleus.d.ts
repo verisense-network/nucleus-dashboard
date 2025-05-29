@@ -2,12 +2,12 @@ export interface NucleusInfo {
   id: string;
   name: string;
   manager: string;
-  wasm_hash: string;
-  wasm_version: number;
-  wasm_location: string;
+  wasmHash: string;
+  wasmVersion: number;
+  wasmLocation: string;
   energy: number;
-  current_event: number;
-  root_state: string;
+  currentEvent: number;
+  rootState: string;
   capacity: number;
 }
 
