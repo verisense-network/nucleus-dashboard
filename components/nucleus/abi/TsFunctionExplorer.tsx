@@ -46,7 +46,6 @@ interface InterfaceField {
   tupleItems?: string[];
 }
 
-// Polkadot Codec Types interfaces
 interface ExtractedClass {
   name: string;
   type: string;
@@ -95,6 +94,146 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   const [functionInputs, setFunctionInputs] = useState<Record<string, any>>({});
   const [result, setResult] = useState<string>("");
   const [loading, setLoading] = useState(false);
+
+  const toggleDebugMode = useCallback((index: number) => {
+    setExtractedClasses(prev => prev.map((item, i) => 
+      i === index ? { ...item, debugMode: !item.debugMode } : item
+    ));
+  }, []);
+
+  const updateDebugValue = useCallback((classIndex: number, fieldPath: string, value: any) => {
+    setExtractedClasses(prev => prev.map((item, i) => {
+      if (i !== classIndex) return item;
+      
+      const updated = { ...item };
+      
+      if (fieldPath === 'debugValue') {
+        updated.debugValue = value;
+      } else if (fieldPath === 'selectedVariant') {
+        updated.selectedVariant = value;
+      } else if (fieldPath.includes('vecValues')) {
+        const vecIndex = parseInt(fieldPath.split('[')[1]?.split(']')[0] || '0');
+        if (updated.vecValues) {
+          updated.vecValues[vecIndex] = value;
+        }
+      } else if (updated.fields) {
+        const pathParts = fieldPath.split('.');
+        updated.fields = updateFieldValue(updated.fields, pathParts, value);
+      }
+      
+      return updated;
+    }));
+  }, []);
+
+  const updateFieldValue = useCallback((fields: DebugField[], pathParts: string[], value: any): DebugField[] => {
+    return fields.map(field => {
+      if (field.name === pathParts[0]) {
+        if (pathParts.length === 2 && pathParts[1] === 'value') {
+          return { ...field, value };
+        } else if (pathParts.length > 2 && field.nestedFields) {
+          return {
+            ...field,
+            nestedFields: updateFieldValue(field.nestedFields, pathParts.slice(1), value)
+          };
+        } else if (pathParts[1]?.includes('[') && field.items) {
+          const itemIndex = parseInt(pathParts[1].split('[')[1]?.split(']')[0] || '0');
+          const newItems = [...field.items];
+          if (newItems[itemIndex]) {
+            newItems[itemIndex] = { ...newItems[itemIndex], value };
+          }
+          return { ...field, items: newItems };
+        }
+      }
+      return field;
+    });
+  }, []);
+
+  const executeDebug = useCallback(async (classIndex: number) => {
+    const codecClass = extractedClasses[classIndex];
+    if (!codecClass) return;
+
+    try {
+      let result = '';
+      
+      if (codecClass.type === 'Struct' && codecClass.fields) {
+        const structData: any = {};
+        codecClass.fields.forEach(field => {
+          if (field.value !== '') {
+            structData[field.name] = field.value;
+          }
+        });
+        
+        const StructType = (window as any)[codecClass.name];
+        if (StructType) {
+          const instance = new StructType(structData);
+          result = `Created ${codecClass.name}: ${instance.toString()}`;
+        } else {
+          result = `Structure data: ${JSON.stringify(structData, null, 2)}`;
+        }
+      } else if (codecClass.type === 'Enum' && codecClass.variants && codecClass.selectedVariant) {
+        const selectedVariant = codecClass.variants.find(v => v.name === codecClass.selectedVariant);
+        if (selectedVariant) {
+          const enumData = selectedVariant.hasValue ? 
+            { [selectedVariant.name]: selectedVariant.value || '' } :
+            selectedVariant.name;
+          
+          const EnumType = (window as any)[codecClass.name];
+          if (EnumType) {
+            const instance = new EnumType(enumData);
+            result = `Created ${codecClass.name}: ${instance.toString()}`;
+          } else {
+            result = `Enum data: ${JSON.stringify(enumData, null, 2)}`;
+          }
+        }
+      } else if (codecClass.type === 'VecFixed' && codecClass.vecValues) {
+        const VecFixedType = (window as any)[codecClass.name];
+        if (VecFixedType) {
+          const instance = new VecFixedType(codecClass.vecValues);
+          result = `Created ${codecClass.name}: ${instance.toString()}`;
+        } else {
+          result = `VecFixed data: [${codecClass.vecValues.join(', ')}]`;
+        }
+      } else if (codecClass.debugValue !== '') {
+        const Type = (window as any)[codecClass.name];
+        if (Type) {
+          const instance = new Type(codecClass.debugValue);
+          result = `Created ${codecClass.name}: ${instance.toString()}`;
+        } else {
+          result = `Value: ${codecClass.debugValue}`;
+        }
+      }
+      
+      setExtractedClasses(prev => prev.map((item, i) => 
+        i === classIndex ? { ...item, debugResult: result } : item
+      ));
+    } catch (error) {
+      const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      setExtractedClasses(prev => prev.map((item, i) => 
+        i === classIndex ? { ...item, debugResult: errorMsg } : item
+      ));
+    }
+  }, [extractedClasses]);
+
+  const addVecItem = useCallback((classIndex: number) => {
+    setExtractedClasses(prev => prev.map((item, i) => {
+      if (i === classIndex && item.vecValues) {
+        return { ...item, vecValues: [...item.vecValues, ''] };
+      }
+      return item;
+    }));
+  }, []);
+
+  const removeVecItem = useCallback((classIndex: number, itemIndex: number) => {
+    setExtractedClasses(prev => prev.map((item, i) => {
+      if (i === classIndex && item.vecValues) {
+        return { 
+          ...item, 
+          vecValues: item.vecValues.filter((_, idx) => idx !== itemIndex) 
+        };
+      }
+      return item;
+    }));
+  }, []);
 
   const isCustomType = useCallback((type: string): boolean => {
     if (!type) return false;
@@ -399,7 +538,6 @@ ${formattedFields.join('\n')}
     for (let i = 0; i < innerContent.length; i++) {
       const char = innerContent[i];
 
-      // 处理引号
       if (!inQuotes && (char === '"' || char === "'")) {
         inQuotes = true;
         quoteChar = char;
@@ -410,7 +548,6 @@ ${formattedFields.join('\n')}
 
       if (inQuotes) continue;
 
-      // 处理括号和圆括号
       if (char === '[' || char === '{') {
         bracketDepth++;
       } else if (char === ']' || char === '}') {
@@ -436,7 +573,6 @@ ${formattedFields.join('\n')}
       }
     }
 
-    // 处理最后一个字段
     if (currentField) {
       const fieldValue = innerContent.substring(currentField.valueStart).trim();
       fields.push({ name: currentField.name, value: fieldValue });
@@ -448,14 +584,11 @@ ${formattedFields.join('\n')}
   const formatEnumTypeDef = useCallback((typeDefObj: string, className: string) => {
     const cleanedObj = typeDefObj.replace(/[\s\n]+/g, ' ').trim();
 
-    // 检查是否是对象格式的枚举定义（如 { A: B, C: D }）
     const isObjectFormat = cleanedObj.startsWith('{') && cleanedObj.endsWith('}');
     
     if (isObjectFormat) {
-      // 处理对象格式的枚举
       const innerContent = cleanedObj.slice(1, -1).trim();
       
-      // 改进的变体解析，支持嵌套的 Struct.with 等复杂类型
       const parseVariants = (content: string) => {
         const variants: { name: string; type: string }[] = [];
         let current = '';
@@ -469,7 +602,6 @@ ${formattedFields.join('\n')}
         for (let i = 0; i < content.length; i++) {
           const char = content[i];
           
-          // 处理引号
           if (!inQuotes && (char === '"' || char === "'")) {
             inQuotes = true;
             quoteChar = char;
@@ -479,7 +611,6 @@ ${formattedFields.join('\n')}
           }
           
           if (!inQuotes) {
-            // 处理括号
             if (char === '(') {
               parenDepth++;
             } else if (char === ')') {
@@ -490,7 +621,6 @@ ${formattedFields.join('\n')}
               braceDepth--;
             }
             
-            // 处理冒号 - 标记开始值部分
             if (char === ':' && !inValue && parenDepth === 0 && braceDepth === 0) {
               variantName = current.trim();
               current = '';
@@ -498,12 +628,10 @@ ${formattedFields.join('\n')}
               continue;
             }
             
-            // 处理逗号 - 结束当前变体
             if (char === ',' && parenDepth === 0 && braceDepth === 0) {
               if (variantName && current.trim()) {
                 variants.push({ name: variantName, type: current.trim() });
               } else if (current.trim() && !inValue) {
-                // 没有值的变体
                 variants.push({ name: current.trim(), type: '' });
               }
               current = '';
@@ -516,7 +644,6 @@ ${formattedFields.join('\n')}
           current += char;
         }
         
-        // 处理最后一个变体
         if (variantName && current.trim()) {
           variants.push({ name: variantName, type: current.trim() });
         } else if (current.trim() && !inValue) {
@@ -541,7 +668,6 @@ ${formattedFields.join('\n')}
           isNullType = true;
           processedType = '';
         } else {
-          // 保持原始类型，包括 Struct.with({ ... }) 这样的复杂类型
           processedType = variantType;
         }
         
@@ -555,7 +681,6 @@ ${formattedFields.join('\n')}
         });
       }
 
-      // 如果找到了变体，返回格式化的枚举
       if (debugVariants.length > 0) {
         return {
           formattedTypeDef: `enum ${className} {
@@ -566,7 +691,6 @@ ${formattedVariants.join(',\n')}
       }
     }
 
-    // 如果没有找到结构化的变体或不是对象格式，尝试简单解析
     const simpleVariantRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)/g;
     let simpleMatch;
     const foundVariants = new Set<string>();
@@ -589,7 +713,6 @@ ${formattedVariants.join(',\n')}
       }
     }
 
-    // 如果还是没找到变体，返回原始定义
     if (debugVariants.length === 0) {
       return {
         formattedTypeDef: `enum ${className} ${cleanedObj}`,
@@ -929,6 +1052,255 @@ ${formattedVariants.join(',\n')}
     parseTsCode();
   }, [tsCode, parseTsCode]);
 
+  const renderFieldInput = useCallback((
+    field: DebugField, 
+    classIndex: number, 
+    fieldPath: string, 
+    level: number = 0
+  ) => {
+    const indent = level * 20;
+    
+    if (field.isVec && field.items) {
+      return (
+        <div key={fieldPath} className="space-y-2" style={{ marginLeft: `${indent}px` }}>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm text-primary">{field.name}</span>
+            <Chip size="sm" variant="flat" color="secondary">Vec&lt;{field.itemType}&gt;</Chip>
+            <Button
+              size="sm"
+              variant="flat"
+              color="primary"
+              onPress={() => {
+                const newItems = [...(field.items || []), { value: '' }];
+                updateDebugValue(classIndex, `${fieldPath}.items`, newItems);
+              }}
+            >
+              Add Item
+            </Button>
+          </div>
+          {field.items.map((item, itemIndex) => (
+            <div key={`${fieldPath}[${itemIndex}]`} className="flex items-center gap-2" style={{ marginLeft: `${indent + 20}px` }}>
+              <Input
+                size="sm"
+                placeholder={getPlaceholder(field.itemType || 'any')}
+                value={item.value || ''}
+                onChange={(e) => updateDebugValue(classIndex, `${fieldPath}[${itemIndex}].value`, e.target.value)}
+              />
+              <Button
+                size="sm"
+                variant="flat"
+                color="danger"
+                onPress={() => {
+                  const newItems = field.items?.filter((_, idx) => idx !== itemIndex) || [];
+                  updateDebugValue(classIndex, `${fieldPath}.items`, newItems);
+                }}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (field.isTuple && field.tupleItems) {
+      return (
+        <div key={fieldPath} className="space-y-2" style={{ marginLeft: `${indent}px` }}>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm text-primary">{field.name}</span>
+            <Chip size="sm" variant="flat" color="secondary">Tuple</Chip>
+          </div>
+          {field.tupleItems.map((tupleItem, tupleIndex) => (
+            <div key={`${fieldPath}_tuple_${tupleIndex}`} className="flex items-center gap-2" style={{ marginLeft: `${indent + 20}px` }}>
+              <span className="text-xs text-default-500">[{tupleIndex}]</span>
+              <Input
+                size="sm"
+                placeholder={getPlaceholder(tupleItem.type)}
+                value={tupleItem.value || ''}
+                onChange={(e) => {
+                  const newTupleItems = [...field.tupleItems!];
+                  newTupleItems[tupleIndex] = { ...tupleItem, value: e.target.value };
+                  updateDebugValue(classIndex, `${fieldPath}.tupleItems`, newTupleItems);
+                }}
+              />
+              <Chip size="sm" variant="flat">{tupleItem.type}</Chip>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (field.nestedFields && field.nestedFields.length > 0) {
+      return (
+        <div key={fieldPath} className="space-y-2" style={{ marginLeft: `${indent}px` }}>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm text-primary">{field.name}</span>
+            <Chip size="sm" variant="flat" color="secondary">Struct</Chip>
+          </div>
+          {field.nestedFields.map((nestedField, nestedIndex) => 
+            renderFieldInput(nestedField, classIndex, `${fieldPath}.${nestedField.name}`, level + 1)
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div key={fieldPath} className="flex items-center gap-2" style={{ marginLeft: `${indent}px` }}>
+        <span className="font-mono text-sm text-primary w-24">{field.name}</span>
+        <Input
+          size="sm"
+          placeholder={getPlaceholder(field.type)}
+          value={field.value || ''}
+          onChange={(e) => updateDebugValue(classIndex, `${fieldPath}.value`, e.target.value)}
+        />
+        <Chip size="sm" variant="flat">{field.type}</Chip>
+        {field.isOption && (
+          <Chip size="sm" variant="flat" color="warning">Optional</Chip>
+        )}
+      </div>
+    );
+  }, [updateDebugValue]);
+
+  const renderDebugInterface = useCallback((codecClass: ExtractedClass, classIndex: number) => {
+    if (!codecClass.debugMode) return null;
+
+    return (
+      <div className="mt-4 p-4 bg-blue-50 rounded-lg space-y-4">
+        <div className="flex items-center justify-between">
+          <h5 className="font-semibold text-blue-800">Debug Type</h5>
+          <Button
+            size="sm"
+            color="primary"
+            onPress={() => executeDebug(classIndex)}
+          >
+            Debug
+          </Button>
+        </div>
+
+        {/* Struct debug */}
+        {codecClass.type === 'Struct' && codecClass.fields && codecClass.fields.length > 0 && (
+          <div className="space-y-3">
+            <h6 className="text-sm font-medium text-blue-700">Structure Fields:</h6>
+            {codecClass.fields.map((field, fieldIndex) => 
+              renderFieldInput(field, classIndex, field.name, 0)
+            )}
+          </div>
+        )}
+
+        {/* Enum debug */}
+        {codecClass.type === 'Enum' && codecClass.variants && codecClass.variants.length > 0 && (
+          <div className="space-y-3">
+            <h6 className="text-sm font-medium text-blue-700">Enum Variant:</h6>
+            <Select
+              size="sm"
+              label="Select Variant"
+              placeholder="Choose a variant"
+              selectedKeys={codecClass.selectedVariant ? [codecClass.selectedVariant] : []}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as string;
+                updateDebugValue(classIndex, 'selectedVariant', selected);
+              }}
+            >
+              {codecClass.variants.map((variant) => (
+                <SelectItem key={variant.name}>
+                  {variant.name}
+                </SelectItem>
+              ))}
+            </Select>
+            {codecClass.selectedVariant && (
+              <div className="mt-2">
+                {(() => {
+                  const selectedVariant = codecClass.variants?.find(v => v.name === codecClass.selectedVariant);
+                  if (selectedVariant?.hasValue) {
+                    return (
+                      <Input
+                        size="sm"
+                        label={`Value for ${selectedVariant.name}`}
+                        placeholder={getPlaceholder(selectedVariant.type || 'any')}
+                        value={selectedVariant.value || ''}
+                        onChange={(e) => {
+                          const updatedVariants = codecClass.variants?.map(v => 
+                            v.name === selectedVariant.name ? { ...v, value: e.target.value } : v
+                          );
+                          setExtractedClasses(prev => prev.map((item, i) => 
+                            i === classIndex ? { ...item, variants: updatedVariants } : item
+                          ));
+                        }}
+                      />
+                    );
+                  }
+                  return <p className="text-sm text-gray-600">No value required for this variant.</p>;
+                })()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VecFixed debug */}
+        {codecClass.type === 'VecFixed' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h6 className="text-sm font-medium text-blue-700">
+                VecFixed Values (Length: {codecClass.length})
+              </h6>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => addVecItem(classIndex)}
+                isDisabled={(codecClass.vecValues?.length || 0) >= (codecClass.length || 0)}
+              >
+                Add
+              </Button>
+            </div>
+            {codecClass.vecValues?.map((value, valueIndex) => (
+              <div key={valueIndex} className="flex items-center gap-2">
+                <span className="text-xs text-default-500 w-8">[{valueIndex}]</span>
+                <Input
+                  size="sm"
+                  placeholder={getPlaceholder(codecClass.itemType || 'any')}
+                  value={value}
+                  onChange={(e) => updateDebugValue(classIndex, `vecValues[${valueIndex}]`, e.target.value)}
+                />
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="danger"
+                  onPress={() => removeVecItem(classIndex, valueIndex)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Common value debug */}
+        {!['Struct', 'Enum', 'VecFixed'].includes(codecClass.type) && (
+          <div className="space-y-3">
+            <h6 className="text-sm font-medium text-blue-700">Value:</h6>
+            <Input
+              size="sm"
+              label={`${codecClass.type} Value`}
+              placeholder={getPlaceholder(codecClass.valueType || codecClass.type)}
+              value={codecClass.debugValue || ''}
+              onChange={(e) => updateDebugValue(classIndex, 'debugValue', e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Debug result */}
+        {codecClass.debugResult && (
+          <div className="space-y-2">
+            <h6 className="text-sm font-medium text-blue-700">Result:</h6>
+            <pre className="text-xs bg-gray-100 p-2 rounded border overflow-auto max-h-40">
+              {codecClass.debugResult}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  }, [updateDebugValue, executeDebug, addVecItem, removeVecItem, renderFieldInput]);
+
   return (
     <div className="space-y-6">
       {extractedClasses.length > 0 && (
@@ -943,11 +1315,22 @@ ${formattedVariants.join(',\n')}
                   key={index}
                   aria-label={codecClass.name}
                   title={
-                    <div className="flex items-center gap-2">
-                      <Chip size="sm" variant="flat" color="secondary">
-                        {codecClass.type}
-                      </Chip>
-                      <span className="font-mono">{codecClass.name}</span>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <Chip size="sm" variant="flat" color="secondary">
+                          {codecClass.type}
+                        </Chip>
+                        <span className="font-mono">{codecClass.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs text-default-500">Debug</span>
+                        <Switch
+                          size="sm"
+                          isSelected={codecClass.debugMode}
+                          onValueChange={() => toggleDebugMode(index)}
+                          color="primary"
+                        />
+                      </div>
                     </div>
                   }
                 >
@@ -988,6 +1371,7 @@ ${formattedVariants.join(',\n')}
                         ))}
                       </div>
                     )}
+                    {renderDebugInterface(codecClass, index)}
                   </div>
                 </AccordionItem>
               ))}
