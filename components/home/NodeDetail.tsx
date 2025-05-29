@@ -77,14 +77,6 @@ export default async function NodeDetail() {
         <span>{networkStats.totalValidators.toLocaleString()}</span>
       ),
     },
-    {   
-      name: "Active Validators",
-      render: (networkStats: NetworkStats) => (
-        <Chip size="sm" variant="flat" color="success">
-          {networkStats.totalValidators.toLocaleString()}
-        </Chip>
-      ),
-    },  
     {
       name: "Total Issuance",
       render: (networkStats: NetworkStats) => (
