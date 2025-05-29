@@ -6,26 +6,38 @@ export async function generateCode(
   const imports = new Set<string>();
   const functionDefinitions: string[] = [];
 
-  imports.add("U8aFixed");
-  imports.add("Null");
-  imports.add("Enum");
+  imports.add("Text");
   imports.add("i8");
+  imports.add("I8");
   imports.add("u8");
+  imports.add("U8");
   imports.add("u16");
+  imports.add("U16");
   imports.add("u32");
   imports.add("U32");
+  imports.add("u64");
   imports.add("U64");
+  imports.add("i16");
+  imports.add("I16");
+  imports.add("i32");
+  imports.add("I32");
+  imports.add("i64");
   imports.add("I64");
+  imports.add("i128");
+  imports.add("I128");
   imports.add("u128");
   imports.add("U128");
-  imports.add("I32");
+  imports.add("U8aFixed");
+  imports.add("VecFixed");
+  imports.add("Null");
+  imports.add("Enum");
   imports.add("Result");
   imports.add("Vec");
   imports.add("Tuple");
   imports.add("Option");
   imports.add("bool");
-  imports.add("Text");
   imports.add("Struct");
+  imports.add("Bytes");
 
   const { typeDefinitions, registeredTypes } = generateTypesInDependencyOrder(entries);
   
@@ -437,8 +449,8 @@ function generateGenericTypeAlias(alias: TypeAliasEntry, entries: AbiEntry[]): s
     const okType = alias.target.generic_args[0];
     const errType = alias.target.generic_args[1];
     
-    let okTypeStr: string = '';
-    let errTypeStr: string = '';
+    let okTypeStr: string;
+    let errTypeStr: string;
     
     if (okType?.kind === "Path" && okType?.path && okType?.path[0]) {
       const okTypeName = okType.path[0];
@@ -644,7 +656,6 @@ function generateTypesInDependencyOrder(entries: AbiEntry[]): { typeDefinitions:
     
     if (entry.type === "type_alias") {
       if (entry.generics && entry.generics.length > 0) {
-        console.log(`Processing generic type alias: ${entry.name}, generics: ${entry.generics}`);
         const aliasCode = generateGenericTypeAlias(entry, Array.from(typeMap.values()));
         typeDefinitions.push(aliasCode);
       } else {

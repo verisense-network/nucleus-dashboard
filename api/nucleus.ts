@@ -1,5 +1,6 @@
+import { ENDPOINT } from "@/config/endpoint";
 import { getPolkadotApi } from "@/lib/polkadotApi";
-import alovaInstance from "@/lib/request";
+import { getRpcClient } from "@/lib/rpcClient";
 import { NucleusInfo } from "@/types/nucleus";
 import { decodeAddress, encodeAddress } from "@polkadot/util-crypto";
 
@@ -42,26 +43,18 @@ export async function getNucleusByIdAPI(id: string): Promise<NucleusInfo> {
   if (!nucleus) {
     throw new Error(`Failed to fetch nucleus detail: ${nucleus}`);
   }
-  const keyBytes = nucleus.toU8a();
-  let nucleusId = '';
-  if (keyBytes.length >= 32) {
-      const idBytes = keyBytes.slice(keyBytes.length - 32);
-      const idAddress = encodeAddress(idBytes, VERISENSE_PREFIX);
-      nucleusId = idAddress;
-  }
-
   return {
-    id: nucleusId,
+    id,
     ...(nucleus.toHuman() as unknown as Omit<NucleusInfo, 'id'>),
   };
 }
 
 export async function getNucleusAbiAPI(id: string): Promise<any> {
-  const res = await alovaInstance.Get<{ data: any }>(`/api/nucleus/${id}/abi`);
+  const endpoint = ENDPOINT.replace("ws://", "http://").replace(/\d{0,4}$/, "9955");
+  const rpcUrl = `${endpoint}/${id}`;
+  const provider = await getRpcClient(rpcUrl);
 
-  if (!res.data) {
-    throw new Error(`Failed to fetch nucleus ABI: ${res}`);
-  }
+  const res = await provider.send("abi", [])
 
-  return res.data;
+  return res;
 }

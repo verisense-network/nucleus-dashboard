@@ -89,7 +89,6 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Detailed Information</h2>
-        
         <Card>
           <CardBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -120,8 +119,8 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
           </CardBody>
         </Card>
       </div>
-      <div>
-        <h2 className="text-xl font-semibold">ABI</h2>
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">ABI Explorer</h2>
         <AbiDetails nucleus={nucleus} />
       </div>
     </div>

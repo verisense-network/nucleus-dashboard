@@ -1,10 +1,8 @@
-import { HttpProvider } from "@polkadot/rpc-provider";
+import { ENDPOINT } from "@/config/endpoint";
+import { HttpProvider, WsProvider } from "@polkadot/rpc-provider";
 
-const provider = new HttpProvider(
-  `${process.env.NEXT_PUBLIC_API_URL}`
-);
-
-export async function getRpcClient() {
+export async function getRpcClient(endpoint?: string) {
+  const provider = endpoint?.startsWith("http") ? new HttpProvider(endpoint) : new WsProvider(endpoint || ENDPOINT);
   if (!provider.isConnected) {
     await provider.connect();
     console.log("provider reconnected");

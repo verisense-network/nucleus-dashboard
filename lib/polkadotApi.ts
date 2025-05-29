@@ -1,9 +1,8 @@
 import { ENDPOINT } from "@/config/endpoint";
-import { ApiPromise, WsProvider } from "@polkadot/api";
+import { ApiPromise, WsProvider, HttpProvider } from "@polkadot/api";
 
-const provider = new WsProvider(ENDPOINT)
-
-export async function getPolkadotApi() {
+export async function getPolkadotApi(endpoint?: string) {
+  const provider = endpoint?.startsWith("http") ? new HttpProvider(endpoint) : new WsProvider(endpoint || ENDPOINT)
   const api = await ApiPromise.create({
     provider,
   });
