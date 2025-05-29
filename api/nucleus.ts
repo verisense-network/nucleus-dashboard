@@ -10,7 +10,7 @@ export async function getNucleusListAPI(): Promise<NucleusInfo[]> {
   
   const entries = await api.query.nucleus.nuclei.entries();
 
-  return entries.map(([key, value]) => {
+  const result = entries.map(([key, value]) => {
     const keyBytes = key.toU8a();
     let nucleusId = '';
     if (keyBytes.length >= 32) {
@@ -25,7 +25,11 @@ export async function getNucleusListAPI(): Promise<NucleusInfo[]> {
       id: nucleusId,
       ...data,
     };
-  });
+  })
+
+  const filteredResult = result.filter((item) => !item.wasmHash.startsWith('0x0000000000000000000000000000000000000000000000000000000000000000'));
+
+  return filteredResult;
 }
 
 export async function getNucleusByIdAPI(id: string): Promise<NucleusInfo> {

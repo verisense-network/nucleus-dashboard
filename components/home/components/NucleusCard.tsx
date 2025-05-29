@@ -57,14 +57,7 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
         <div className="flex flex-col gap-1">
           <h4 className="text-lg font-semibold">{nucleus.name}</h4>
           <div className="flex items-center gap-2">
-            <User
-              name={<div>
-                ID: <AddressViewFormat address={nucleus.id} bracket={false} />
-              </div>}
-              avatarProps={{
-                size: "sm",
-              }}
-            />
+            <span className="text-sm">ID: {nucleus.id}</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
