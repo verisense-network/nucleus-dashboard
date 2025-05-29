@@ -12,7 +12,6 @@ interface NucleusCardProps {
 }
 
 export default function NucleusCard({ nucleus, showLink = true }: NucleusCardProps) {
-  console.log("nucleus", nucleus);
   const details = [
     {
       name: "Manager",

@@ -85,11 +85,9 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
         <p className="text-default-500">View the detailed information of {nucleus.name}</p>
       </div>
 
-      <div className="max-w-4xl">
-        <NucleusCard nucleus={nucleus} showLink={false} />
-      </div>
+      <NucleusCard nucleus={nucleus} showLink={false} />
 
-      <div className="max-w-4xl space-y-4">
+      <div className="space-y-4">
         <h2 className="text-xl font-semibold">Detailed Information</h2>
         
         <Card>
