@@ -117,8 +117,25 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           updated.vecValues[vecIndex] = value;
         }
       } else if (updated.fields) {
-        const pathParts = fieldPath.split('.');
-        updated.fields = updateFieldValue(updated.fields, pathParts, value);
+        // 处理带有数组索引的路径，如 "a[0].value"
+        if (fieldPath.includes('[') && fieldPath.includes('].value')) {
+          const fieldName = fieldPath.split('[')[0];
+          const itemIndex = parseInt(fieldPath.split('[')[1]?.split(']')[0] || '0');
+          
+          updated.fields = updated.fields.map(field => {
+            if (field.name === fieldName && field.items) {
+              const newItems = [...field.items];
+              if (newItems[itemIndex]) {
+                newItems[itemIndex] = { ...newItems[itemIndex], value };
+              }
+              return { ...field, items: newItems };
+            }
+            return field;
+          });
+        } else {
+          const pathParts = fieldPath.split('.');
+          updated.fields = updateFieldValue(updated.fields, pathParts, value);
+        }
       }
       
       return updated;
@@ -142,6 +159,9 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
             newItems[itemIndex] = { ...newItems[itemIndex], value };
           }
           return { ...field, items: newItems };
+        } else if (pathParts[1] === 'items' && pathParts.length === 2) {
+          // 处理直接设置items数组的情况
+          return { ...field, items: value };
         }
       }
       return field;
@@ -165,8 +185,12 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         
         const StructType = (window as any)[codecClass.name];
         if (StructType) {
-          const instance = new StructType(structData);
-          result = `Created ${codecClass.name}: ${instance.toString()}`;
+          console.log("structData", structData);
+          const instance = new StructType((window as any).registry, structData);
+          const hex = instance.toHex();
+          const humanReadable = instance?.toHuman() || 'null';
+          const json = instance?.toJSON() || 'null';
+          result = `Created ${codecClass.name}: \nhex: ${hex} \n humanReadable: ${JSON.stringify(humanReadable, null, 2)} \n json: ${JSON.stringify(json, null, 2)}`;
         } else {
           result = `Structure data: ${JSON.stringify(structData, null, 2)}`;
         }
@@ -180,7 +204,9 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           const EnumType = (window as any)[codecClass.name];
           if (EnumType) {
             const instance = new EnumType(enumData);
-            result = `Created ${codecClass.name}: ${instance.toString()}`;
+            const hex = instance.toHex();
+            const humanReadable = instance.toHuman();
+            result = `Created ${codecClass.name}: \nhex: ${hex} \n humanReadable: ${humanReadable}`;
           } else {
             result = `Enum data: ${JSON.stringify(enumData, null, 2)}`;
           }
@@ -189,7 +215,9 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         const VecFixedType = (window as any)[codecClass.name];
         if (VecFixedType) {
           const instance = new VecFixedType(codecClass.vecValues);
-          result = `Created ${codecClass.name}: ${instance.toString()}`;
+          const hex = instance.toHex();
+          const humanReadable = instance.toHuman();
+          result = `Created ${codecClass.name}: \nhex: ${hex} \n humanReadable: ${humanReadable}`;
         } else {
           result = `VecFixed data: [${codecClass.vecValues.join(', ')}]`;
         }
@@ -207,6 +235,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         i === classIndex ? { ...item, debugResult: result } : item
       ));
     } catch (error) {
+      console.error("error", error);
       const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
       setExtractedClasses(prev => prev.map((item, i) => 
         i === classIndex ? { ...item, debugResult: errorMsg } : item
@@ -362,53 +391,43 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   }, []);
 
   const extractPolkadotTypeInfo = useCallback((classCode: string, className: string, extendsClass: string | null): ExtractedClass | null => {
-    const polkadotTypes = ['Struct', 'Enum', 'Vec', 'Tuple', 'Compact', 'Option'];
+    const polkadotTypes = ['Struct', 'Enum', 'Vec', 'Tuple', 'Compact', 'Option', 'Result'];
     if (!extendsClass || !polkadotTypes.includes(extendsClass)) {
       return null;
     }
 
-    const constructorRegex = /constructor\s*\([^)]*\)\s*{\s*super\s*\([^,]*,\s*({(?:[^{}]*|\{[^{}]*\})*})(?:,\s*[^)]*)\)\s*;/;
-    const match = classCode.match(constructorRegex);
+    const constructorPatterns = [
+      // standard format: constructor(registry, value) { super(registry, {...}, value); }
+      /constructor\s*\(\s*registry\s*,\s*value\s*\)\s*{\s*super\s*\(\s*registry\s*,\s*({[^}]*(?:\{[^}]*\}[^}]*)*})\s*,\s*value\s*\)\s*;\s*}/,
+      // Result format: constructor(registry, T, value) { super(registry, T, Text, value); }
+      /constructor\s*\(\s*registry\s*,\s*T\s*,\s*value\s*\)\s*{\s*super\s*\(\s*registry\s*,\s*T\s*,\s*([A-Za-z0-9_]+)\s*,\s*value\s*\)\s*;\s*}/,
+      // compatible with old format
+      /constructor\s*\([^)]*\)\s*{\s*super\s*\([^,]*,\s*({(?:[^{}]*|\{[^{}]*\})*})(?:,\s*[^)]*)\)\s*;/,
+      // more flexible format
+      /super\s*\([^,]*,\s*({[^}]*(?:\{[^}]*\}[^}]*)*})/
+    ];
 
-    if (!match || !match[1]) {
-      
-      const relaxedRegex = /super\s*\([^,]*,\s*({[^}]*})/;
-      const relaxedMatch = classCode.match(relaxedRegex);
-      
-      if (!relaxedMatch || !relaxedMatch[1]) {
-        return null;
+    let typeDefObj = '';
+    let isResultType = false;
+    let resultErrorType = '';
+
+    for (const pattern of constructorPatterns) {
+      const match = classCode.match(pattern);
+      if (match) {
+        if (extendsClass === 'Result' && match[1] && !match[1].startsWith('{')) {
+          isResultType = true;
+          resultErrorType = match[1];
+          typeDefObj = `{ Ok: T, Err: ${resultErrorType} }`;
+        } else {
+          typeDefObj = match[1];
+        }
+        break;
       }
-      
-      const typeDefObj = relaxedMatch[1];
-      
-      let formattedTypeDef = '';
-      let debugFields: DebugField[] = [];
-      let debugVariants: DebugVariant[] = [];
-      let valueType = null;
-
-      if (extendsClass === 'Enum') {
-        const result = formatEnumTypeDef(typeDefObj, className);
-        formattedTypeDef = result.formattedTypeDef;
-        debugVariants = result.variants;
-      } else {
-        formattedTypeDef = `${extendsClass}<${className}> ${typeDefObj.replace(/[{\s}]/g, ' ').trim()}`;
-      }
-
-      return {
-        name: className,
-        type: extendsClass,
-        definition: formattedTypeDef,
-        debugMode: false,
-        fields: debugFields,
-        variants: debugVariants,
-        valueType: valueType || undefined,
-        debugValue: '',
-        selectedVariant: debugVariants.length > 0 ? debugVariants[0].name : undefined,
-        debugResult: null
-      };
     }
 
-    const typeDefObj = match[1];
+    if (!typeDefObj) {
+      return null;
+    }
 
     let formattedTypeDef = '';
     let debugFields: DebugField[] = [];
@@ -419,15 +438,107 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       const result = formatStructTypeDef(typeDefObj, className);
       formattedTypeDef = result.formattedTypeDef;
       debugFields = result.fields;
+      
+      try {
+        const structFields = parseObjectFields(typeDefObj);
+        const fieldTypes = structFields.reduce((acc: any, field) => {
+          let fieldType = field.value.trim();
+          
+          if (fieldType.includes('Vec.with(')) {
+            const vecMatch = fieldType.match(/Vec\.with\(([^)]+)\)/);
+            if (vecMatch) {
+              const itemTypeName = vecMatch[1].trim();
+              const itemType = (window as any)[itemTypeName] || codecTypes[itemTypeName as keyof typeof codecTypes];
+              if (itemType) {
+                acc[field.name] = codecTypes.Vec.with(itemType);
+              }
+            }
+          } else if (fieldType.includes('Tuple.with(')) {
+            const tupleMatch = fieldType.match(/Tuple\.with\(\[([^\]]+)\]/);
+            if (tupleMatch) {
+              const tupleTypes = tupleMatch[1].split(',').map((t: string) => {
+                const typeName = t.trim();
+                return (window as any)[typeName] || codecTypes[typeName as keyof typeof codecTypes] || typeName;
+              });
+              acc[field.name] = codecTypes.Tuple.with(tupleTypes);
+            }
+          } else if (fieldType.includes('U8aFixed.with(')) {
+            const u8aMatch = fieldType.match(/U8aFixed\.with\((\d+)\s*\)/);
+            if (u8aMatch) {
+              const length = parseInt(u8aMatch[1]);
+              acc[field.name] = codecTypes.U8aFixed.with(length as any);
+            }
+          } else {
+            const resolvedType = (window as any)[fieldType] || codecTypes[fieldType as keyof typeof codecTypes];
+            acc[field.name] = resolvedType || fieldType;
+          }
+          
+          return acc;
+        }, {});
+        
+        (window as any)[className] = codecTypes.Struct.with(fieldTypes);
+      } catch (error) {
+        console.error(`Define Struct ${className} Error:`, error);
+      }
+      
     } else if (extendsClass === 'Enum') {
       const result = formatEnumTypeDef(typeDefObj, className);
       formattedTypeDef = result.formattedTypeDef;
       debugVariants = result.variants;
+      
+      try {
+        const enumFields = parseObjectFields(typeDefObj);
+        const enumTypes = enumFields.reduce((acc: any, field) => {
+          const fieldType = field.value.trim();
+          if (fieldType && fieldType !== 'null' && fieldType !== 'Null') {
+            const resolvedType = (window as any)[fieldType] || codecTypes[fieldType as keyof typeof codecTypes];
+            acc[field.name] = resolvedType || fieldType;
+          } else {
+            acc[field.name] = null;
+          }
+          return acc;
+        }, {});
+        
+        (window as any)[className] = codecTypes.Enum.with(enumTypes);
+      } catch (error) {
+        console.error(`Define Enum ${className} Error:`, error);
+      }
+      
+    } else if (extendsClass === 'Result') {
+      if (isResultType) {
+        formattedTypeDef = `Result<T, ${resultErrorType}>`;
+        debugVariants = [
+          { name: 'Ok', type: 'T', hasValue: true, value: '' },
+          { name: 'Err', type: resultErrorType, hasValue: true, value: '' }
+        ];
+        
+        // 在 window 上定义 Result 类型
+        try {
+          const errorType = (window as any)[resultErrorType] || codecTypes[resultErrorType as keyof typeof codecTypes] || codecTypes.Text;
+          (window as any)[className] = class extends (codecTypes.Result as any) {
+            constructor(registry: any, T: any, value?: any) {
+              super(registry, T, errorType, value);
+            }
+          };
+        } catch (error) {
+          console.error(`Define Result ${className} Error:`, error);
+        }
+      }
+      
     } else if (extendsClass === 'Vec') {
       const vecTypeMatch = typeDefObj.match(/([A-Za-z0-9_]+)/);
       if (vecTypeMatch) {
         valueType = vecTypeMatch[1];
         formattedTypeDef = `Vec<${valueType}>`;
+        
+        try {
+          const itemType = (window as any)[valueType] || codecTypes[valueType as keyof typeof codecTypes];
+          if (itemType) {
+            (window as any)[className] = codecTypes.Vec.with(itemType);
+          }
+        } catch (error) {
+          console.error(`Define Vec ${className} Error:`, error);
+        }
       } else {
         formattedTypeDef = `Vec<${className}>`;
       }
@@ -436,6 +547,15 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       if (optionTypeMatch) {
         valueType = optionTypeMatch[1];
         formattedTypeDef = `Option<${valueType}>`;
+        
+        try {
+          const innerType = (window as any)[valueType] || codecTypes[valueType as keyof typeof codecTypes];
+          if (innerType) {
+            (window as any)[className] = codecTypes.Option.with(innerType);
+          }
+        } catch (error) {
+          console.error(`Define Option ${className} Error:`, error);
+        }
       } else {
         formattedTypeDef = `Option<${className}>`;
       }
@@ -868,7 +988,7 @@ ${formattedVariants.join(',\n')}
           }
         });
         (window as any)[enumName] = enumObj;
-      } catch (error) {
+    } catch (error) {
         console.warn(`define enum ${enumName} error:`, error);
       }
     }
@@ -1071,8 +1191,7 @@ ${formattedVariants.join(',\n')}
               variant="flat"
               color="primary"
               onPress={() => {
-                const newItems = [...(field.items || []), { value: '' }];
-                updateDebugValue(classIndex, `${fieldPath}.items`, newItems);
+                updateDebugValue(classIndex, `${fieldPath}.items`, [...(field.items || []), { value: '' }]);
               }}
             >
               Add Item
@@ -1316,10 +1435,10 @@ ${formattedVariants.join(',\n')}
                   aria-label={codecClass.name}
                   title={
                     <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <Chip size="sm" variant="flat" color="secondary">
+                    <div className="flex items-center gap-2">
+                      <Chip size="sm" variant="flat" color="secondary">
                           {codecClass.type}
-                        </Chip>
+                      </Chip>
                         <span className="font-mono">{codecClass.name}</span>
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -1346,11 +1465,11 @@ ${formattedVariants.join(',\n')}
                       <div className="space-y-1">
                         {codecClass.fields.map((field, fieldIndex) => (
                           <div key={fieldIndex} className="flex items-center gap-2 text-sm ml-4">
-                            <span className="font-mono text-primary">{field.name}</span>
-                            <span>:</span>
-                            <span className="font-mono text-secondary">{field.type}</span>
-                          </div>
-                        ))}
+                        <span className="font-mono text-primary">{field.name}</span>
+                        <span>:</span>
+                        <span className="font-mono text-secondary">{field.type}</span>
+                      </div>
+                    ))}
                       </div>
                     )}
                     {codecClass.variants && codecClass.variants.length > 0 && (

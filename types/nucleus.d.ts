@@ -9,6 +9,7 @@ export interface NucleusInfo {
   currentEvent: number;
   rootState: string;
   capacity: number;
+  a2aCompatiable: boolean;
 }
 
 export interface NucleusListResponse {

@@ -55,12 +55,19 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="flex justify-between items-start">
         <div className="flex flex-col gap-1">
-          <h4 className="text-lg font-semibold">{nucleus.name}</h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-lg font-semibold">{nucleus.name}</h4>
+            {nucleus.a2aCompatiable && (
+              <Chip size="sm" variant="flat" color="success">
+                A2A
+              </Chip>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-sm">ID: {nucleus.id}</span>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex items-end gap-2">
           <Chip size="sm" variant="flat" color="primary">
             Version: {nucleus.wasmVersion}
           </Chip>

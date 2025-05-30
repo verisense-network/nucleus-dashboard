@@ -34,7 +34,6 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
       setAbiData(data);
 
       const tsCode = await generateCode(data);
-      console.log("tsCode", tsCode);
 
       setTsCode(tsCode);
 
@@ -47,10 +46,6 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
   }, [nucleus.id]);
 
   const extractAndDefineCodecImports = useCallback((jsCode: string) => {
-    (window as any).codecTypes = codecTypes;
-    const registry = new TypeRegistry() as unknown as Registry;
-    (window as any).registry = registry;
-
     const importRegex = /import\s*{\s*([^}]+)\s*}\s*from\s*['"]@polkadot\/types-codec['"];?/gs;
     let match;
     const windowDeclarations: string[] = [];
@@ -78,7 +73,11 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
         .filter(item => item !== null) as { original: string; alias: string }[];
 
       items.forEach(({ original, alias }) => {
-        console.log("original", original, "alias", alias);
+        if (codecTypes[original as keyof typeof codecTypes]) {
+          (window as any)[alias] = codecTypes[original as keyof typeof codecTypes];
+          console.log(`Registered ${alias} to window`);
+        }
+
         windowDeclarations.push(`(window).${alias} = codecTypes.${original};`);
         (window as any).registry.register({
           [alias]: codecTypes[original as keyof typeof codecTypes] as any,
@@ -87,25 +86,93 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     }
 
     if (windowDeclarations.length > 0) {
-      let modifiedCode = jsCode.replace(importRegex, '');
-
       console.log('Found @polkadot/types-codec imports, added window declarations:', windowDeclarations);
-      return modifiedCode;
+    }
+  }, []);
+
+  const extractClasses = useCallback((jsCode: string) => {
+    const classStartRegex = /export\s+class\s+(\w+)\s+extends\s+(\w+)\s*\{/g;
+    const foundClasses: string[] = [];
+    let match;
+    const classDefinitions: string[] = [];
+
+    while ((match = classStartRegex.exec(jsCode)) !== null) {
+      const className = match[1];
+      const baseClass = match[2];
+      const startIndex = match.index;
+      const openBraceIndex = match.index + match[0].length - 1;
+
+      let braceCount = 1;
+      let endIndex = openBraceIndex + 1;
+
+      while (endIndex < jsCode.length && braceCount > 0) {
+        if (jsCode[endIndex] === '{') {
+          braceCount++;
+        } else if (jsCode[endIndex] === '}') {
+          braceCount--;
+        }
+        endIndex++;
+      }
+
+      if (braceCount === 0) {
+        foundClasses.push(className);
+
+        const fullClassDef = jsCode.substring(startIndex, endIndex);
+        const classDefWithoutExport = fullClassDef.replace(/^export\s+/, '');
+        classDefinitions.push(classDefWithoutExport);
+      }
     }
 
-    
+    if (classDefinitions.length > 0) {
+      try {
+        for (const classDef of classDefinitions) {
+          const classNameMatch = classDef.match(/class\s+(\w+)\s+extends/);
+          if (classNameMatch) {
+            const className = classNameMatch[1];
 
-    return jsCode;
+            const funcCode = `
+              ${classDef}
+              return ${className};
+            `;
+
+            const func = new Function(funcCode);
+            const ClassConstructor = func.call(
+              window,
+            );
+
+            (window as any)[className] = ClassConstructor;
+            console.log(`Successfully registered class ${className} to window`);
+          }
+        }
+
+        foundClasses.forEach(className => {
+          if ((window as any)[className]) {
+            (window as any).registry.register({
+              [className]: (window as any)[className],
+            });
+          }
+        });
+
+      } catch (error) {
+        console.error("Error executing class definitions:", error);
+      }
+    }
+
+    return foundClasses;
   }, []);
 
   const defineCodecTypesToWindow = useCallback((tsCode: string) => {
+    (window as any).codecTypes = codecTypes;
+    const registry = new TypeRegistry() as unknown as Registry;
+    (window as any).registry = registry;
+
     let jsCode = transform(tsCode, { transforms: ['typescript'] }).code;
 
     jsCode = jsCode.replace(/^\s*export\s+/g, '');
 
-    jsCode = extractAndDefineCodecImports(jsCode);
+    extractAndDefineCodecImports(jsCode);
 
-    console.log("jsCode", jsCode);
+    extractClasses(jsCode);
   }, []);
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { ENDPOINT } from "@/config/endpoint";
 import { getPolkadotApi } from "@/lib/polkadotApi";
 import { getRpcClient } from "@/lib/rpcClient";
 import { NucleusInfo } from "@/types/nucleus";
+import { WsProvider } from "@polkadot/rpc-provider";
 import { decodeAddress, encodeAddress } from "@polkadot/util-crypto";
 
 const VERISENSE_PREFIX = 137
@@ -50,11 +51,10 @@ export async function getNucleusByIdAPI(id: string): Promise<NucleusInfo> {
 }
 
 export async function getNucleusAbiAPI(id: string): Promise<any> {
-  const endpoint = ENDPOINT.replace("ws://", "http://").replace(/\d{0,4}$/, "9955");
-  const rpcUrl = `${endpoint}/${id}`;
+  const rpcUrl = `${ENDPOINT}/${id}`;
   const provider = await getRpcClient(rpcUrl);
 
-  const res = await provider.send("abi", [])
+  const res = await provider.request({ method: "abi", params: [] })
 
   return res;
 }
