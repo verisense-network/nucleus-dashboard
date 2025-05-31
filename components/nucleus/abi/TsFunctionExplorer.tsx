@@ -132,6 +132,17 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
             }
             return field;
           });
+        } else if (fieldPath.includes('.tupleItems')) {
+          // 处理Tuple字段的tupleItems更新
+          const pathParts = fieldPath.split('.');
+          const fieldName = pathParts[0];
+          
+          updated.fields = updated.fields.map(field => {
+            if (field.name === fieldName) {
+              return { ...field, tupleItems: value };
+            }
+            return field;
+          });
         } else {
           const pathParts = fieldPath.split('.');
           updated.fields = updateFieldValue(updated.fields, pathParts, value);
@@ -178,19 +189,34 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       if (codecClass.type === 'Struct' && codecClass.fields) {
         const structData: any = {};
         codecClass.fields.forEach(field => {
-          if (field.value !== '') {
+          if (field.isVec && field.items && field.items.length > 0) {
+            // 处理Vec类型字段
+            const vecValues = field.items
+              .map(item => item.value)
+              .filter(val => val !== '' && val !== undefined && val !== null);
+            if (vecValues.length > 0) {
+              structData[field.name] = vecValues;
+            }
+          } else if (field.isTuple && field.tupleItems && field.tupleItems.length > 0) {
+            // 处理Tuple类型字段
+            const tupleValues = field.tupleItems.map(item => item.value);
+            if (tupleValues.some(val => val !== '' && val !== undefined && val !== null)) {
+              structData[field.name] = tupleValues;
+            }
+          } else if (field.value !== '') {
+            // 处理普通字段
             structData[field.name] = field.value;
           }
         });
         
+        console.log("structData", structData);
         const StructType = (window as any)[codecClass.name];
         if (StructType) {
-          console.log("structData", structData);
           const instance = new StructType((window as any).registry, structData);
           const hex = instance.toHex();
           const humanReadable = instance?.toHuman() || 'null';
           const json = instance?.toJSON() || 'null';
-          result = `Created ${codecClass.name}: \nhex: ${hex} \n humanReadable: ${JSON.stringify(humanReadable, null, 2)} \n json: ${JSON.stringify(json, null, 2)}`;
+          result = `Created ${codecClass.name}: \nhex: ${hex} \n\nhumanReadable: ${JSON.stringify(humanReadable, null, 2)} \n\njson: ${JSON.stringify(json, null, 2)}`;
         } else {
           result = `Structure data: ${JSON.stringify(structData, null, 2)}`;
         }
@@ -444,7 +470,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         const fieldTypes = structFields.reduce((acc: any, field) => {
           let fieldType = field.value.trim();
           
-          if (fieldType.includes('Vec.with(')) {
+          if (fieldType.includes('Vec.with')) {
             const vecMatch = fieldType.match(/Vec\.with\(([^)]+)\)/);
             if (vecMatch) {
               const itemTypeName = vecMatch[1].trim();
@@ -453,15 +479,18 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                 acc[field.name] = codecTypes.Vec.with(itemType);
               }
             }
-          } else if (fieldType.includes('Tuple.with(')) {
+          } else if (fieldType.includes('Tuple.with')) {
             const tupleMatch = fieldType.match(/Tuple\.with\(\[([^\]]+)\]/);
-            if (tupleMatch) {
-              const tupleTypes = tupleMatch[1].split(',').map((t: string) => {
-                const typeName = t.trim();
+            if (tupleMatch && tupleMatch[1]) {
+              const tupleTypesStr = tupleMatch[1];
+              const types = tupleTypesStr.split(',').map(t => t.trim());
+              const tupleTypes = types.map((typeName: string) => {
                 return (window as any)[typeName] || codecTypes[typeName as keyof typeof codecTypes] || typeName;
               });
               acc[field.name] = codecTypes.Tuple.with(tupleTypes);
             }
+          } else if (fieldType.includes('Option<') || fieldType.includes('Option.with')) {
+            // 处理Option类型，这里暂时不做特殊处理
           } else if (fieldType.includes('U8aFixed.with(')) {
             const u8aMatch = fieldType.match(/U8aFixed\.with\((\d+)\s*\)/);
             if (u8aMatch) {
@@ -601,6 +630,21 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           itemType = vecTypeMatch[1].trim();
         }
         fieldType = fieldType.replace(/Vec\.with\(([^)]+)\)/, 'Vec<$1>');
+      }
+
+      if (fieldType.includes('Tuple.with')) {
+        isTuple = true;
+        const tupleMatch = fieldType.match(/Tuple\.with\(\[([^\]]+)\]/);
+        if (tupleMatch && tupleMatch[1]) {
+          const tupleTypesStr = tupleMatch[1];
+          const types = tupleTypesStr.split(',').map(t => t.trim());
+          tupleTypes = types.map((type, index) => ({
+            type: type,
+            value: '',
+            index: index
+          }));
+        }
+        fieldType = fieldType.replace(/Tuple\.with\(\[([^\]]+)\]\)/, 'Tuple<$1>');
       }
 
       if (fieldType.includes('Option<') || fieldType.includes('Option.with')) {
