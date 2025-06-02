@@ -59,7 +59,7 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
             <h4 className="text-lg font-semibold">{nucleus.name}</h4>
             {nucleus.a2aCompatiable && (
               <Chip size="sm" variant="flat" color="success">
-                A2A
+                Agent
               </Chip>
             )}
           </div>

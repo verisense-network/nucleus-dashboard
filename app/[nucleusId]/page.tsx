@@ -7,6 +7,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import NucleusCard from "@/components/home/components/NucleusCard";
 import AbiDetails from "@/components/nucleus/abi/AbiDetails";
+import OpenLogs from "@/components/nucleus/OpenLogs";
 
 interface NucleusDetailPageProps {
   params: Promise<{
@@ -88,7 +89,10 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
       <NucleusCard nucleus={nucleus} showLink={false} />
 
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Detailed Information</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Detailed Information</h2>
+          <OpenLogs nucleusId={nucleusId} />
+        </div>
         <Card>
           <CardBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
