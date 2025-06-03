@@ -1956,7 +1956,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
             </div>
             {(!codecClass.vecValues || codecClass.vecValues.length === 0) && (
               <div className="text-sm text-gray-500 italic">
-                No items, click "Add Item" to start
+                No items, click &quot;Add Item&quot; to start
               </div>
             )}
             {codecClass.vecValues?.map((value, valueIndex) => (
