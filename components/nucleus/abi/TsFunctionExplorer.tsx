@@ -20,6 +20,9 @@ interface ParsedFunction {
   parameters: Parameter[];
   returnType: string;
   description?: string;
+  debugMode?: boolean;
+  debugInputs?: DebugField[];
+  debugResult?: string | null;
 }
 
 interface Parameter {
@@ -104,6 +107,35 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     setExtractedClasses(prev => prev.map((item, i) =>
       i === index ? { ...item, debugMode: !item.debugMode } : item
     ));
+  }, []);
+
+  const toggleFunctionDebugMode = useCallback((functionIndex: number) => {
+    setFunctions(prev => prev.map((func, i) => {
+      if (i === functionIndex) {
+        const debugMode = !func.debugMode;
+        if (debugMode && !func.debugInputs) {
+          // Initialize debug inputs when enabling debug mode
+          const debugInputs = func.parameters.map(param => 
+            convertParameterToDebugField(param)
+          );
+          return { ...func, debugMode, debugInputs };
+        }
+        return { ...func, debugMode };
+      }
+      return func;
+    }));
+  }, []);
+
+  const updateFunctionInput = useCallback((functionIndex: number, fieldPath: string, value: any) => {
+    setFunctions(prev => prev.map((func, i) => {
+      if (i !== functionIndex || !func.debugInputs) return func;
+
+      const pathParts = fieldPath.split('.');
+      const updated = { ...func };
+      updated.debugInputs = updateFieldValue(updated.debugInputs || [], pathParts, value);
+
+      return updated;
+    }));
   }, []);
 
   const updateDebugValue = useCallback((classIndex: number, fieldPath: string, value: any) => {
@@ -251,6 +283,41 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       }));
     }
     return [];
+  }, []);
+
+  const convertParameterToDebugField = useCallback((param: Parameter): DebugField => {
+    return {
+      name: param.name,
+      type: param.type,
+      value: '',
+      isVec: isVecType(param.type),
+      isTuple: isTupleType(param.type),
+      isOption: isOptionType(param.type),
+      isStruct: false,
+      isEnum: false,
+      itemType: isVecType(param.type) ? extractVecItemType(param.type) : undefined,
+      tupleItems: isTupleType(param.type) ? parseTupleTypes(param.type) : [],
+      nestedFields: [],
+      enumVariants: [],
+      hasValue: false,
+      items: isVecType(param.type) ? [{ value: '' }] : [],
+      referencedStructName: undefined,
+      referencedEnumName: undefined
+    };
+  }, [isVecType, isTupleType, isOptionType, extractVecItemType, parseTupleTypes]);
+
+  const getPlaceholder = useCallback((type: string): string => {
+    if (type.includes('number') || type.includes('bigint') || /u\d+|i\d+/.test(type)) {
+      return '0';
+    } else if (type.includes('string') || type.includes('String')) {
+      return 'Enter text...';
+    } else if (type.includes('boolean')) {
+      return 'true/false';
+    } else if (type.includes('[]') || type.includes('Array')) {
+      return '[]';
+    } else {
+      return 'Enter value...';
+    }
   }, []);
 
   const parseStructFields = useCallback((structContent: string): DebugField[] => {
@@ -789,9 +856,6 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
 
       if (braceCount === 0) {
         classCount++;
-        console.log(`find class definition ${classCount}:`, className, 'extends:', extendsType);
-        console.log(`class content preview:`, classContent.substring(0, 200) + '...');
-
         // special handling for classes that inherit Args
         if (extendsType === 'Args') {
           // parse Args class super call
@@ -1142,6 +1206,38 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     }
   }, [extractedClasses, collectNestedStructData]);
 
+  const executeFunctionDebug = useCallback(async (functionIndex: number) => {
+    const func = functions[functionIndex];
+    if (!func || !func.debugInputs) return;
+
+    try {
+      const functionArgs = collectNestedStructData(func.debugInputs);
+      
+      const FunctionType = (window as any)[func.name];
+      let result = '';
+
+      console.log("func.name", func.name)
+      console.log("functionArgs", functionArgs)
+
+      if (FunctionType && typeof FunctionType === 'function') {
+        const functionResult = await FunctionType(...Object.values(functionArgs));
+        result = `Function call result:\n${JSON.stringify(functionResult, null, 2)}`;
+      } else {
+        result = `Function ${func.name} parameters data:\n${JSON.stringify(functionArgs, null, 2)}\n\nParameter types:\n${func.parameters.map(p => `${p.name}: ${p.type}`).join('\n')}`;
+      }
+
+      setFunctions(prev => prev.map((f, i) =>
+        i === functionIndex ? { ...f, debugResult: result } : f
+      ));
+    } catch (error) {
+      console.error("Function execution error", error);
+      const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      setFunctions(prev => prev.map((f, i) =>
+        i === functionIndex ? { ...f, debugResult: errorMsg } : f
+      ));
+    }
+  }, [functions, collectNestedStructData]);
+
   const addVecItem = useCallback((classIndex: number) => {
     setExtractedClasses(prev => prev.map((item, i) => {
       if (i === classIndex) {
@@ -1242,8 +1338,6 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     if (!code || typeof code !== 'string') return;
     const parsedFunctions: ParsedFunction[] = [];
 
-    console.log('Starting function definition parsing...');
-
     // Enhanced function parsing regex, supports more formats
     const functionPatterns = [
       // Standard function definition: function name(params): returnType
@@ -1267,10 +1361,16 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         const name = match[1];
         const params = match[2] || '';
         const returnType = match[3];
+        
+        // Check if function with same name already exists
+        const existingFunction = parsedFunctions.find(f => f.name === name);
+        if (existingFunction) {
+          console.log(`Skipping duplicate function: ${name}`);
+          continue;
+        }
+        
         patternMatches++;
         totalMatches++;
-
-        console.log(`Found function ${totalMatches} (pattern ${patternIndex + 1}):`, name, 'params:', params, 'return type:', returnType.trim());
 
         const parameters = parseParameters(params);
 
@@ -1286,8 +1386,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       }
     });
 
-    console.log(`Function parsing completed, found ${parsedFunctions.length} functions:`,
-      parsedFunctions.map(f => `${f.name}(${f.parameters.length} params)`).join(', '));
+    console.log(`Function parsing completed, found ${parsedFunctions.length} unique functions:`,
+      parsedFunctions.map(f => `${f.name}(${f.parameters.length} parameters)`).join(', '));
 
     setFunctions(parsedFunctions);
   }, [parseParameters]);
@@ -1379,14 +1479,20 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     field: DebugField,
     classIndex: number,
     fieldPath: string,
-    level: number = 0
+    level: number = 0,
+    context: 'type' | 'function' = 'type'
   ) => {
     const indent = level * 20;
 
-    console.log(`Rendering field: ${field.name}, type: ${field.type}, isVec: ${field.isVec}, items: ${field.items?.length}`);
+    const handleValueUpdate = (path: string, newValue: any) => {
+      if (context === 'function') {
+        updateFunctionInput(classIndex, path, newValue);
+      } else {
+        updateDebugValue(classIndex, path, newValue);
+      }
+    };
 
     if (field.isVec && field.items) {
-      console.log(`Rendering Vec field: ${field.name}, has ${field.items.length} items`);
       return (
         <div key={fieldPath} className="space-y-2" style={{ marginLeft: `${indent}px` }}>
           <div className="flex items-center gap-2">
@@ -1397,13 +1503,16 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
               variant="flat"
               color="primary"
               onPress={() => {
-                console.log(`Clicked add Vec item: ${fieldPath}`);
                 if (level > 0) {
-                  // For nested fields, use dedicated function
-                  addVecItemForNestedField(classIndex, fieldPath);
+                  if (context === 'function') {
+                    const newItems = [...(field.items || []), { value: '' }];
+                    updateFunctionInput(classIndex, `${fieldPath}.items`, newItems);
+                  } else {
+                    addVecItemForNestedField(classIndex, fieldPath);
+                  }
                 } else {
-                  // For top-level fields, use existing updateDebugValue
-                  updateDebugValue(classIndex, `${fieldPath}.items`, [...(field.items || []), { value: '' }]);
+                  const newItems = [...(field.items || []), { value: '' }];
+                  handleValueUpdate(`${fieldPath}.items`, newItems);
                 }
               }}
             >
@@ -1417,7 +1526,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                 size="sm"
                 placeholder={getPlaceholder(field.itemType || 'any')}
                 value={item.value || ''}
-                onChange={(e) => updateDebugValue(classIndex, `${fieldPath}[${itemIndex}].value`, e.target.value)}
+                onChange={(e) => handleValueUpdate(`${fieldPath}[${itemIndex}].value`, e.target.value)}
               />
               <Button
                 size="sm"
@@ -1425,12 +1534,15 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                 color="danger"
                 onPress={() => {
                   if (level > 0) {
-                    // For nested fields, use dedicated function
-                    removeVecItemForNestedField(classIndex, fieldPath, itemIndex);
+                    if (context === 'function') {
+                      const newItems = field.items?.filter((_, idx) => idx !== itemIndex) || [];
+                      updateFunctionInput(classIndex, `${fieldPath}.items`, newItems);
+                    } else {
+                      removeVecItemForNestedField(classIndex, fieldPath, itemIndex);
+                    }
                   } else {
-                    // For top-level fields, use existing updateDebugValue
                     const newItems = field.items?.filter((_, idx) => idx !== itemIndex) || [];
-                    updateDebugValue(classIndex, `${fieldPath}.items`, newItems);
+                    handleValueUpdate(`${fieldPath}.items`, newItems);
                   }
                 }}
               >
@@ -1459,7 +1571,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                 onChange={(e) => {
                   const newTupleItems = [...field.tupleItems!];
                   newTupleItems[tupleIndex] = { ...tupleItem, value: e.target.value };
-                  updateDebugValue(classIndex, `${fieldPath}.tupleItems`, newTupleItems);
+                  handleValueUpdate(`${fieldPath}.tupleItems`, newTupleItems);
                 }}
               />
               <Chip size="sm" variant="flat">{tupleItem.type}</Chip>
@@ -1485,7 +1597,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           </div>
           <div className="border-l-2 border-blue-200 pl-4" style={{ marginLeft: `${indent + 10}px` }}>
             {field.nestedFields.map((nestedField, nestedIndex) =>
-              renderFieldInput(nestedField, classIndex, `${fieldPath}.${nestedField.name}`, level + 1)
+              renderFieldInput(nestedField, classIndex, `${fieldPath}.${nestedField.name}`, level + 1, context)
             )}
           </div>
         </div>
@@ -1514,7 +1626,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
               selectedKeys={field.selectedVariant ? [field.selectedVariant] : []}
               onSelectionChange={(keys) => {
                 const selected = Array.from(keys)[0] as string;
-                updateDebugValue(classIndex, `${fieldPath}.selectedVariant`, selected);
+                handleValueUpdate(`${fieldPath}.selectedVariant`, selected);
               }}
             >
               {field.enumVariants.map((variant) => (
@@ -1546,7 +1658,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                                 nestedField,
                                 classIndex,
                                 `variants.${selectedVariant.name}.${nestedField.name}`,
-                                1
+                                1,
+                                context
                               )
                             )}
                           </div>
@@ -1564,7 +1677,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                             const updatedVariants = field.enumVariants?.map((v: DebugVariant) =>
                               v.name === selectedVariant.name ? { ...v, value: e.target.value } : v
                             );
-                            updateDebugValue(classIndex, `${fieldPath}.enumVariants`, updatedVariants);
+                            handleValueUpdate(`${fieldPath}.enumVariants`, updatedVariants);
                           }}
                         />
                       );
@@ -1586,7 +1699,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           size="sm"
           placeholder={getPlaceholder(field.type)}
           value={field.value || ''}
-          onChange={(e) => updateDebugValue(classIndex, `${fieldPath}.value`, e.target.value)}
+          onChange={(e) => handleValueUpdate(`${fieldPath}.value`, e.target.value)}
         />
         <Chip size="sm" variant="flat">{field.type}</Chip>
         {field.isOption && (
@@ -1594,7 +1707,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         )}
       </div>
     );
-  }, [updateDebugValue, addVecItemForNestedField, removeVecItemForNestedField]);
+  }, [updateDebugValue, updateFunctionInput, addVecItemForNestedField, removeVecItemForNestedField, getPlaceholder]);
 
   const renderDebugInterface = useCallback((codecClass: ExtractedClass, classIndex: number) => {
     if (!codecClass.debugMode) return null;
@@ -1821,7 +1934,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           </div>
         )}
 
-        {/* Vec type debug - 支持多项目 */}
+        {/* Vec type debug - support multiple items */}
         {codecClass.type === 'Vec' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -2018,21 +2131,45 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         )}
       </div>
     );
-  }, [updateDebugValue, executeDebug, addVecItem, removeVecItem, renderFieldInput]);
+  }, [updateDebugValue, executeDebug, addVecItem, removeVecItem, renderFieldInput, getPlaceholder]);
 
-  const getPlaceholder = useCallback((type: string): string => {
-    if (type.includes('number') || type.includes('bigint') || /u\d+|i\d+/.test(type)) {
-      return '0';
-    } else if (type.includes('string') || type.includes('String')) {
-      return 'Enter text...';
-    } else if (type.includes('boolean')) {
-      return 'true/false';
-    } else if (type.includes('[]') || type.includes('Array')) {
-      return '[]';
-    } else {
-      return 'Enter value...';
-    }
-  }, []);
+  const renderFunctionDebugInterface = useCallback((func: ParsedFunction, functionIndex: number) => {
+    if (!func.debugMode) return null;
+
+    return (
+      <div className="mt-4 p-4 bg-green-50 rounded-lg space-y-4">
+        <div className="flex items-center justify-between">
+          <h5 className="font-semibold text-green-800">Debug Function</h5>
+          <Button
+            size="sm"
+            color="success"
+            onPress={() => executeFunctionDebug(functionIndex)}
+          >
+            Execute
+          </Button>
+        </div>
+
+        {/* Function parameters input */}
+        {func.debugInputs && func.debugInputs.length > 0 && (
+          <div className="space-y-3">
+            {func.debugInputs.map((field, fieldIndex) =>
+              renderFieldInput(field, functionIndex, field.name, 0, 'function')
+            )}
+          </div>
+        )}
+
+        {/* Function debug result */}
+        {func.debugResult && (
+          <div className="space-y-2">
+            <h6 className="text-sm font-medium text-green-700">Result:</h6>
+            <pre className="text-xs bg-gray-100 p-2 rounded border overflow-auto max-h-40">
+              {func.debugResult}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  }, [executeFunctionDebug, renderFieldInput]);
 
   return (
     <div className="space-y-6">
@@ -2062,18 +2199,6 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                 <span className="text-default-600">Struct Types:</span>
                 <Chip size="sm" variant="flat" color={extractedClasses.filter(c => c.type === 'Struct').length > 0 ? "success" : "default"}>
                   {extractedClasses.filter(c => c.type === 'Struct').length}
-                </Chip>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-default-600">Vec Types:</span>
-                <Chip size="sm" variant="flat" color={extractedClasses.filter(c => c.type === 'Vec').length > 0 ? "success" : "default"}>
-                  {extractedClasses.filter(c => c.type === 'Vec').length}
-                </Chip>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-default-600">Simple Types:</span>
-                <Chip size="sm" variant="flat" color={extractedClasses.filter(c => ['Integer', 'Boolean', 'Text', 'Hash', 'TypeAlias'].includes(c.type)).length > 0 ? "success" : "default"}>
-                  {extractedClasses.filter(c => ['Integer', 'Boolean', 'Text', 'Hash', 'TypeAlias'].includes(c.type)).length}
                 </Chip>
               </div>
               <div className="flex items-center gap-2">
@@ -2214,17 +2339,44 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                 >
                   <CardBody>
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Chip size="sm" variant="flat" color="primary">Function</Chip>
-                        <span className="font-mono font-semibold">{func.name}</span>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <Chip size="sm" variant="flat" color="primary">Function</Chip>
+                          <span className="font-mono font-semibold">{func.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-xs text-default-500">Debug</span>
+                          <Switch
+                            size="sm"
+                            isSelected={func.debugMode}
+                            onValueChange={() => toggleFunctionDebugMode(index)}
+                            color="success"
+                          />
+                        </div>
                       </div>
                       <div className="text-sm text-default-500">
                         Parameters: {func.parameters.length}
                       </div>
                       <div className="text-sm">
-                        Returns: <span className="font-mono">{func.returnType}</span>
+                        Return type: <span className="font-mono">{func.returnType}</span>
                       </div>
+                      {func.parameters.length > 0 && (
+                        <div className="space-y-1">
+                          <div className="text-xs text-default-500">Parameter list:</div>
+                          {func.parameters.map((param, paramIndex) => (
+                            <div key={paramIndex} className="flex items-center gap-2 text-xs ml-4">
+                              <span className="font-mono text-primary">{param.name}</span>
+                              <span>:</span>
+                              <span className="font-mono text-secondary">{param.type}</span>
+                              {param.optional && (
+                                <Chip size="sm" variant="flat" color="warning">Optional</Chip>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                    {renderFunctionDebugInterface(func, index)}
                   </CardBody>
                 </Card>
               ))}

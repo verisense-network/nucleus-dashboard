@@ -10,6 +10,9 @@ import { generateCode } from "./generator";
 import * as codecTypes from '@polkadot/types-codec';
 import { TypeRegistry } from '@polkadot/types';
 import { Registry } from "@polkadot/types/types";
+import { HttpProvider, WsProvider } from "@polkadot/rpc-provider";
+import { ApiPromise } from "@polkadot/api";
+import { ENDPOINT } from "@/config/endpoint";
 
 interface AbiDetailsProps {
   nucleus: NucleusInfo;
@@ -162,39 +165,36 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
   }, []);
 
   const extractAndDefineConstantTypes = useCallback((jsCode: string) => {
-    // 存储类型定义以处理依赖关系
     const typeDefinitions: Array<{
       name: string;
       value: string;
       originalLine: string;
       dependencies: string[];
     }> = [];
-    
-    // 匹配 export const Name = Type; 格式
+
+    // match export const Name = Type; format
     const constantTypeRegex = /export\s+const\s+([A-Za-z_$][A-Za-z0-9_]*)\s*=\s*([^;]+);/g;
     let match;
-    
+
     while ((match = constantTypeRegex.exec(jsCode)) !== null) {
       const typeName = match[1];
       const typeValue = match[2].trim();
       const originalLine = match[0];
-      
-      console.log(`找到常量类型定义: ${typeName} = ${typeValue}`);
-      
-      // 分析依赖关系
+
+      // analyze dependencies
       const dependencies: string[] = [];
       const dependencyRegex = /\b([A-Z][A-Za-z0-9_]*)\b/g;
       let depMatch;
-      
+
       while ((depMatch = dependencyRegex.exec(typeValue)) !== null) {
         const depName = depMatch[1];
-        // 排除已知的基础类型和关键字
-        if (!['U8aFixed', 'U8aBitLength', 'U8', 'U16', 'U32', 'U64', 'U128', 'U256', 'I8', 'I16', 'I32', 'I64', 'I128', 'I256', 
-              'Bool', 'Text', 'Bytes', 'Null', 'Option', 'Vec', 'Struct', 'Enum', 'Tuple', 'Result', 'with', 'as'].includes(depName)) {
+        // exclude known base types and keywords
+        if (!['U8aFixed', 'U8aBitLength', 'U8', 'U16', 'U32', 'U64', 'U128', 'U256', 'I8', 'I16', 'I32', 'I64', 'I128', 'I256',
+          'Bool', 'Text', 'Bytes', 'Null', 'Option', 'Vec', 'Struct', 'Enum', 'Tuple', 'Result', 'with', 'as'].includes(depName)) {
           dependencies.push(depName);
         }
       }
-      
+
       typeDefinitions.push({
         name: typeName,
         value: typeValue,
@@ -202,35 +202,35 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
         dependencies
       });
     }
-    
-    console.log(`总共找到 ${typeDefinitions.length} 个常量类型定义`);
-    
-    // 按依赖关系排序，确保依赖的类型先被定义
+
+    console.log(`Found ${typeDefinitions.length} constant type definitions`);
+
+    // sort by dependencies, ensure dependent types are defined first
     const sortedDefinitions = [...typeDefinitions];
     const processed = new Set<string>();
     const result: typeof typeDefinitions = [];
-    
-    // 简单的拓扑排序
+
+    // simple topological sort
     while (result.length < sortedDefinitions.length) {
       let addedInThisRound = false;
-      
+
       for (const def of sortedDefinitions) {
         if (processed.has(def.name)) continue;
-        
-        // 检查所有依赖是否已处理
-        const canProcess = def.dependencies.every(dep => 
-          processed.has(dep) || 
-          !typeDefinitions.some(td => td.name === dep) // 依赖不在我们的定义列表中（外部类型）
+
+        // check if all dependencies are processed
+        const canProcess = def.dependencies.every(dep =>
+          processed.has(dep) ||
+          !typeDefinitions.some(td => td.name === dep) // dependency not in our definition list (external type)
         );
-        
+
         if (canProcess) {
           result.push(def);
           processed.add(def.name);
           addedInThisRound = true;
         }
       }
-      
-      // 如果没有任何类型被添加，说明存在循环依赖或其他问题，按原序列添加剩余类型
+
+      // if no types are added, there is a circular dependency or other problem, add remaining types in original order
       if (!addedInThisRound) {
         for (const def of sortedDefinitions) {
           if (!processed.has(def.name)) {
@@ -241,91 +241,228 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
         break;
       }
     }
-    
-    console.log('按依赖关系排序后的类型定义:', result.map(d => d.name).join(', '));
-    
-    // 定义类型到 window
+
+    // define types to window
     result.forEach(({ name, value, originalLine }) => {
       try {
-        console.log(`正在定义类型: ${name} = ${value}`);
-        
-        // 处理不同类型的定义
+        console.log(`Defining type: ${name} = ${value}`);
+
+        // handle different type definitions
         if (value.includes('.with(')) {
-          // 处理工厂函数调用，如 U8aFixed.with(160 as U8aBitLength)
+          // handle factory function calls, e.g. U8aFixed.with(160 as U8aBitLength)
           const factoryFuncCode = `
             try {
               const result = ${value};
               (window).${name} = result;
-              console.log('成功定义工厂类型 ${name}:', result);
+              console.log('Successfully defined factory type ${name}:', result);
               return result;
             } catch (error) {
-              console.error('定义工厂类型 ${name} 时出错:', error);
+              console.error('Error defining factory type ${name}:', error);
               return null;
             }
           `;
-          
+
           const func = new Function('codecTypes', 'window', factoryFuncCode);
           const typeInstance = func.call(window, codecTypes, window);
-          
+
           if (typeInstance) {
             (window as any)[name] = typeInstance;
             (window as any).registry.register({
               [name]: typeInstance,
             });
-            console.log(`成功注册工厂类型 ${name} 到 window 和 registry`);
+            console.log(`Successfully registered factory type ${name} to window and registry`);
           }
         } else {
-          // 处理简单的类型引用，如 U32, H160
+          // handle simple type references, e.g. U32, H160
           if (codecTypes[value as keyof typeof codecTypes]) {
-            // 直接的 codecTypes 引用
+            // direct codecTypes reference
             (window as any)[name] = codecTypes[value as keyof typeof codecTypes];
             (window as any).registry.register({
               [name]: codecTypes[value as keyof typeof codecTypes],
             });
-            console.log(`成功注册基础类型 ${name} = ${value} 到 window 和 registry`);
+            console.log(`Successfully registered base type ${name} = ${value} to window and registry`);
           } else if ((window as any)[value]) {
-            // 引用已经在 window 中定义的类型
+            // reference already defined in window
             (window as any)[name] = (window as any)[value];
             (window as any).registry.register({
               [name]: (window as any)[value],
             });
-            console.log(`成功注册引用类型 ${name} = ${value} 到 window 和 registry`);
+            console.log(`Successfully registered reference type ${name} = ${value} to window and registry`);
           } else {
-            // 尝试动态执行
+            // try dynamic execution
             try {
               const evalCode = `
                 try {
                   const result = ${value};
                   (window).${name} = result;
-                  console.log('成功定义动态类型 ${name}:', result);
+                  console.log('Successfully defined dynamic type ${name}:', result);
                   return result;
                 } catch (error) {
-                  console.error('定义动态类型 ${name} 时出错:', error);
+                  console.error('Error defining dynamic type ${name}:', error);
                   return null;
                 }
               `;
-              
+
               const func = new Function('codecTypes', 'window', evalCode);
               const typeInstance = func.call(window, codecTypes, window);
-              
+
               if (typeInstance) {
                 (window as any)[name] = typeInstance;
                 (window as any).registry.register({
                   [name]: typeInstance,
                 });
-                console.log(`成功注册动态类型 ${name} 到 window 和 registry`);
+                console.log(`Successfully registered dynamic type ${name} to window and registry`);
               }
             } catch (error) {
-              console.warn(`无法定义类型 ${name} = ${value}:`, error);
+              console.warn(`Cannot define type ${name} = ${value}:`, error);
             }
           }
         }
       } catch (error) {
-        console.error(`定义类型 ${name} 时出错:`, error);
+        console.error(`Error defining type ${name}:`, error);
       }
     });
-    
-    console.log(`常量类型定义完成，成功注册 ${result.length} 个类型`);
+
+    console.log(`Constant type definitions completed, successfully registered ${result.length} types`);
+  }, []);
+
+  const extractAndDefineFunctions = useCallback((jsCode: string) => {
+    const functionDefinitions: Array<{
+      name: string;
+      isAsync: boolean;
+      parameters: string[];
+      body: string;
+      fullDefinition: string;
+    }> = [];
+    const functionPatterns = [
+      // Pattern 1: export async function name(...) {  (JavaScript, no types)
+      /export\s+async\s+function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*\{/g,
+      // Pattern 2: export function name(...) {  (JavaScript, no types)
+      /export\s+function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*\{/g,
+      // Pattern 3: More flexible - export (async)? function (JavaScript)
+      /export\s+(async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*\{/g
+    ];
+
+    functionPatterns.forEach((pattern, patternIndex) => {
+      pattern.lastIndex = 0; // Reset regex
+      let match;
+      let patternMatches = 0;
+
+      while ((match = pattern.exec(jsCode)) !== null) {
+        const isAsync = patternIndex === 0 || (patternIndex === 2 && !!match[1]);
+        const functionName = patternIndex === 2 ? match[2] : match[1];
+        const parametersStr = patternIndex === 2 ? match[3] : match[2]; // Updated for new regex groups
+        const startIndex = match.index;
+
+        // Re-extract parameters more carefully
+        const functionStartMatch = jsCode.substring(startIndex).match(/function\s+[A-Za-z_$][A-Za-z0-9_$]*\s*\(([^)]*)\)/);
+        const actualParameters = functionStartMatch ? functionStartMatch[1] : parametersStr;
+
+        // find the complete function body by counting braces
+        const openBraceIndex = jsCode.indexOf('{', startIndex);
+        if (openBraceIndex === -1) {
+          console.log(`No opening brace found for function ${functionName}`);
+          continue;
+        }
+
+        let braceCount = 1;
+        let endIndex = openBraceIndex + 1;
+
+        while (endIndex < jsCode.length && braceCount > 0) {
+          if (jsCode[endIndex] === '{') {
+            braceCount++;
+          } else if (jsCode[endIndex] === '}') {
+            braceCount--;
+          }
+          endIndex++;
+        }
+
+        if (braceCount === 0) {
+          const fullDefinition = jsCode.substring(startIndex, endIndex);
+          const functionBody = jsCode.substring(openBraceIndex + 1, endIndex - 1);
+
+          const parameters = actualParameters
+            .split(',')
+            .map(param => param.trim())
+            .filter(param => param)
+
+          functionDefinitions.push({
+            name: functionName,
+            isAsync,
+            parameters,
+            body: functionBody,
+            fullDefinition
+          });
+
+          patternMatches++;
+        } else {
+          console.log(`Brace mismatch for function ${functionName}, braceCount: ${braceCount}`);
+        }
+      }
+    });
+
+    console.log(`Found ${functionDefinitions.length} function definitions`);
+
+    // If no functions found, let's do a broader search to see what's in the code
+    if (functionDefinitions.length === 0) {
+      // Look for any function-like patterns
+      const broadSearch = /function\s+([A-Za-z_$][A-Za-z0-9_$]*)/g;
+      let broadMatch;
+      const foundFunctionNames = [];
+
+      while ((broadMatch = broadSearch.exec(jsCode)) !== null) {
+        foundFunctionNames.push(broadMatch[1]);
+      }
+
+      console.log('Found function names in code:', foundFunctionNames);
+
+      // Look for export patterns
+      const exportSearch = /export\s+[^;{]+/g;
+      let exportMatch;
+      const foundExports = [];
+
+      while ((exportMatch = exportSearch.exec(jsCode)) !== null) {
+        foundExports.push(exportMatch[0]);
+      }
+    }
+
+    // define functions to window
+    functionDefinitions.forEach(({ name, isAsync, parameters, body, fullDefinition }) => {
+      try {
+        console.log(`Defining function: ${name}`);
+
+        // Extract original parameter list with types for the function signature
+        const originalParamsMatch = fullDefinition.match(/function\s+[^(]*\(([^)]*)\)/);
+        const originalParams = originalParamsMatch ? originalParamsMatch[1] : parameters.join(', ');
+
+        // create function wrapper that has access to required globals
+        const functionWrapper = `
+          ${isAsync ? 'async ' : ''}function ${name}(${originalParams}) {
+              ${body}
+            }
+        `;
+
+        const func = new Function(`
+            const codecTypes = arguments[0];
+            const window = arguments[1];
+            
+            ${functionWrapper}
+            
+            return ${name};
+          `);
+
+        const functionInstance = func.call(window, codecTypes, window);
+
+        if (functionInstance) {
+          (window as any)[name] = functionInstance;
+          console.log(`Successfully registered function ${name} to window`);
+        }
+      } catch (error) {
+        console.error(`Error defining function ${name}:`, error);
+      }
+    });
+
+    console.log(`Function definitions completed, successfully registered ${functionDefinitions.length} functions`);
   }, []);
 
   const defineCodecTypesToWindow = useCallback((tsCode: string) => {
@@ -333,17 +470,28 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     const registry = new TypeRegistry() as unknown as Registry;
     (window as any).registry = registry;
 
-    let jsCode = transform(tsCode, { transforms: ['typescript'] }).code;
+    (window as any).HttpProvider = HttpProvider;
+    (window as any).WsProvider = WsProvider;
+    (window as any).ApiPromise = ApiPromise;
+    (window as any).Buffer = Buffer;
 
-    jsCode = jsCode.replace(/^\s*export\s+/g, '');
+    let jsCode = transform(tsCode, { transforms: ['typescript'] }).code;
 
     extractAndDefineCodecImports(jsCode);
 
     extractClasses(jsCode);
-    
-    // 添加常量类型提取
+
     extractAndDefineConstantTypes(jsCode);
-  }, [extractAndDefineCodecImports, extractClasses, extractAndDefineConstantTypes]);
+
+    extractAndDefineFunctions(jsCode);
+
+    const api = new ApiPromise({
+      provider: new WsProvider(ENDPOINT.replace('http', 'ws')),
+    });
+
+    (window as any).api = api;
+
+  }, [extractAndDefineCodecImports, extractClasses, extractAndDefineConstantTypes, extractAndDefineFunctions]);
 
   useEffect(() => {
     loadAbiData();
