@@ -161,6 +161,173 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     return foundClasses;
   }, []);
 
+  const extractAndDefineConstantTypes = useCallback((jsCode: string) => {
+    // 存储类型定义以处理依赖关系
+    const typeDefinitions: Array<{
+      name: string;
+      value: string;
+      originalLine: string;
+      dependencies: string[];
+    }> = [];
+    
+    // 匹配 export const Name = Type; 格式
+    const constantTypeRegex = /export\s+const\s+([A-Za-z_$][A-Za-z0-9_]*)\s*=\s*([^;]+);/g;
+    let match;
+    
+    while ((match = constantTypeRegex.exec(jsCode)) !== null) {
+      const typeName = match[1];
+      const typeValue = match[2].trim();
+      const originalLine = match[0];
+      
+      console.log(`找到常量类型定义: ${typeName} = ${typeValue}`);
+      
+      // 分析依赖关系
+      const dependencies: string[] = [];
+      const dependencyRegex = /\b([A-Z][A-Za-z0-9_]*)\b/g;
+      let depMatch;
+      
+      while ((depMatch = dependencyRegex.exec(typeValue)) !== null) {
+        const depName = depMatch[1];
+        // 排除已知的基础类型和关键字
+        if (!['U8aFixed', 'U8aBitLength', 'U8', 'U16', 'U32', 'U64', 'U128', 'U256', 'I8', 'I16', 'I32', 'I64', 'I128', 'I256', 
+              'Bool', 'Text', 'Bytes', 'Null', 'Option', 'Vec', 'Struct', 'Enum', 'Tuple', 'Result', 'with', 'as'].includes(depName)) {
+          dependencies.push(depName);
+        }
+      }
+      
+      typeDefinitions.push({
+        name: typeName,
+        value: typeValue,
+        originalLine,
+        dependencies
+      });
+    }
+    
+    console.log(`总共找到 ${typeDefinitions.length} 个常量类型定义`);
+    
+    // 按依赖关系排序，确保依赖的类型先被定义
+    const sortedDefinitions = [...typeDefinitions];
+    const processed = new Set<string>();
+    const result: typeof typeDefinitions = [];
+    
+    // 简单的拓扑排序
+    while (result.length < sortedDefinitions.length) {
+      let addedInThisRound = false;
+      
+      for (const def of sortedDefinitions) {
+        if (processed.has(def.name)) continue;
+        
+        // 检查所有依赖是否已处理
+        const canProcess = def.dependencies.every(dep => 
+          processed.has(dep) || 
+          !typeDefinitions.some(td => td.name === dep) // 依赖不在我们的定义列表中（外部类型）
+        );
+        
+        if (canProcess) {
+          result.push(def);
+          processed.add(def.name);
+          addedInThisRound = true;
+        }
+      }
+      
+      // 如果没有任何类型被添加，说明存在循环依赖或其他问题，按原序列添加剩余类型
+      if (!addedInThisRound) {
+        for (const def of sortedDefinitions) {
+          if (!processed.has(def.name)) {
+            result.push(def);
+            processed.add(def.name);
+          }
+        }
+        break;
+      }
+    }
+    
+    console.log('按依赖关系排序后的类型定义:', result.map(d => d.name).join(', '));
+    
+    // 定义类型到 window
+    result.forEach(({ name, value, originalLine }) => {
+      try {
+        console.log(`正在定义类型: ${name} = ${value}`);
+        
+        // 处理不同类型的定义
+        if (value.includes('.with(')) {
+          // 处理工厂函数调用，如 U8aFixed.with(160 as U8aBitLength)
+          const factoryFuncCode = `
+            try {
+              const result = ${value};
+              (window).${name} = result;
+              console.log('成功定义工厂类型 ${name}:', result);
+              return result;
+            } catch (error) {
+              console.error('定义工厂类型 ${name} 时出错:', error);
+              return null;
+            }
+          `;
+          
+          const func = new Function('codecTypes', 'window', factoryFuncCode);
+          const typeInstance = func.call(window, codecTypes, window);
+          
+          if (typeInstance) {
+            (window as any)[name] = typeInstance;
+            (window as any).registry.register({
+              [name]: typeInstance,
+            });
+            console.log(`成功注册工厂类型 ${name} 到 window 和 registry`);
+          }
+        } else {
+          // 处理简单的类型引用，如 U32, H160
+          if (codecTypes[value as keyof typeof codecTypes]) {
+            // 直接的 codecTypes 引用
+            (window as any)[name] = codecTypes[value as keyof typeof codecTypes];
+            (window as any).registry.register({
+              [name]: codecTypes[value as keyof typeof codecTypes],
+            });
+            console.log(`成功注册基础类型 ${name} = ${value} 到 window 和 registry`);
+          } else if ((window as any)[value]) {
+            // 引用已经在 window 中定义的类型
+            (window as any)[name] = (window as any)[value];
+            (window as any).registry.register({
+              [name]: (window as any)[value],
+            });
+            console.log(`成功注册引用类型 ${name} = ${value} 到 window 和 registry`);
+          } else {
+            // 尝试动态执行
+            try {
+              const evalCode = `
+                try {
+                  const result = ${value};
+                  (window).${name} = result;
+                  console.log('成功定义动态类型 ${name}:', result);
+                  return result;
+                } catch (error) {
+                  console.error('定义动态类型 ${name} 时出错:', error);
+                  return null;
+                }
+              `;
+              
+              const func = new Function('codecTypes', 'window', evalCode);
+              const typeInstance = func.call(window, codecTypes, window);
+              
+              if (typeInstance) {
+                (window as any)[name] = typeInstance;
+                (window as any).registry.register({
+                  [name]: typeInstance,
+                });
+                console.log(`成功注册动态类型 ${name} 到 window 和 registry`);
+              }
+            } catch (error) {
+              console.warn(`无法定义类型 ${name} = ${value}:`, error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`定义类型 ${name} 时出错:`, error);
+      }
+    });
+    
+    console.log(`常量类型定义完成，成功注册 ${result.length} 个类型`);
+  }, []);
+
   const defineCodecTypesToWindow = useCallback((tsCode: string) => {
     (window as any).codecTypes = codecTypes;
     const registry = new TypeRegistry() as unknown as Registry;
@@ -173,7 +340,10 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     extractAndDefineCodecImports(jsCode);
 
     extractClasses(jsCode);
-  }, []);
+    
+    // 添加常量类型提取
+    extractAndDefineConstantTypes(jsCode);
+  }, [extractAndDefineCodecImports, extractClasses, extractAndDefineConstantTypes]);
 
   useEffect(() => {
     loadAbiData();
