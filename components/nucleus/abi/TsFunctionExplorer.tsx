@@ -253,6 +253,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   }, []);
 
   const updateDebugValue = useCallback((classIndex: number, fieldPath: string, value: any) => {
+    console.log(`🔧 updateDebugValue called: classIndex=${classIndex}, fieldPath="${fieldPath}", value=`, value);
+    
     setExtractedClasses(prev => prev.map((item, i) => {
       if (i !== classIndex) return item;
 
@@ -270,6 +272,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       } else if (fieldPath.startsWith('variants.')) {
         // Handle nested field paths in Enum variants, such as "variants.OpenAI.key.value"
         const pathParts = fieldPath.split('.');
+        console.log(`🔧 Processing variants path: ${JSON.stringify(pathParts)}`);
+        
         if (pathParts.length >= 4 && updated.variants) { // variants.VariantName.fieldName.value
           const variantName = pathParts[1];
           const fieldName = pathParts[2];
@@ -279,6 +283,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
             if (variant.name === variantName && variant.nestedFields) {
               const updatedNestedFields = variant.nestedFields.map(field => {
                 if (field.name === fieldName && property === 'value') {
+                  console.log(`🔧 Updating variant field: ${variantName}.${fieldName}.${property} = `, value);
                   return { ...field, value };
                 }
                 return field;
@@ -287,10 +292,14 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
             }
             return variant;
           });
+        } else {
+          console.log(`⚠️ variants path too short or no variants available: ${pathParts.length}, hasVariants: ${!!updated.variants}`);
         }
       } else if (updated.fields) {
-        // Handle paths with array indices, such as "a[0].value"
-        if (fieldPath.includes('[') && fieldPath.includes('].value')) {
+        console.log(`🔧 Processing fields path: "${fieldPath}"`);
+        
+        // Handle paths with array indices, such as "a[0].value" 
+        if (fieldPath.includes('[') && fieldPath.includes('].value') && !fieldPath.includes('.')) {
           const fieldName = fieldPath.split('[')[0];
           const itemIndex = parseInt(fieldPath.split('[')[1]?.split(']')[0] || '0');
 
@@ -305,20 +314,58 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
             return field;
           });
         } else if (fieldPath.includes('.tupleItems')) {
-          // Handle tupleItems updates for Tuple fields
+          // Handle tupleItems updates for Tuple fields 
           const pathParts = fieldPath.split('.');
           const fieldName = pathParts[0];
-
-          updated.fields = updated.fields.map(field => {
-            if (field.name === fieldName) {
-              return { ...field, tupleItems: value };
+          
+          if (pathParts.length === 2 && pathParts[1] === 'tupleItems') {
+            updated.fields = updated.fields.map(field => {
+              if (field.name === fieldName) {
+                return { ...field, tupleItems: value };
+              }
+              return field;
+            });
+          } else {
+            const pathParts = fieldPath.split('.');
+            
+            const originalFields = JSON.stringify(updated.fields);
+            updated.fields = updateFieldValue(updated.fields, pathParts, value);
+            
+            const fieldsChanged = JSON.stringify(updated.fields) !== originalFields;
+            console.log(`🔧 Fields updated for nested tupleItems: ${fieldsChanged}`);
+            
+            if (!fieldsChanged) {
+              console.log(`⚠️ No fields were updated for tupleItems path: ${fieldPath}`);
+            } else {
+              console.log(`✅ Fields successfully updated for tupleItems path: ${fieldPath}`);
             }
-            return field;
-          });
+          }
         } else {
+          // Handle deep nested field paths
           const pathParts = fieldPath.split('.');
+          console.log(`🔧 Calling updateFieldValue with pathParts: ${JSON.stringify(pathParts)}`);
+          console.log(`🔧 Current fields structure:`, updated.fields?.map(f => ({ 
+            name: f.name, 
+            hasNested: (f.nestedFields?.length || 0) > 0,
+            hasItems: (f.items?.length || 0) > 0,
+            isVec: f.isVec
+          })));
+          
+          const originalFields = JSON.stringify(updated.fields);
           updated.fields = updateFieldValue(updated.fields, pathParts, value);
+          
+          const fieldsChanged = JSON.stringify(updated.fields) !== originalFields;
+          console.log(`🔧 Fields updated: ${fieldsChanged}`);
+          
+          if (!fieldsChanged) {
+            console.log(`⚠️ No fields were updated for path: ${fieldPath}`);
+            console.log(`Current field structure:`, updated.fields.map(f => ({ name: f.name, hasNested: (f.nestedFields?.length || 0) > 0 })));
+          } else {
+            console.log(`✅ Fields successfully updated for path: ${fieldPath}`);
+          }
         }
+      } else {
+        console.log(`⚠️ No fields available for item ${classIndex}`);
       }
 
       return updated;
@@ -326,29 +373,72 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   }, []);
 
   const updateFieldValue = useCallback((fields: DebugField[], pathParts: string[], value: any): DebugField[] => {
+    if (pathParts.length === 0) return fields;
+    
     return fields.map(field => {
-      if (field.name === pathParts[0]) {
+      const currentPathPart = pathParts[0];
+      const hasArrayIndex = currentPathPart.includes('[') && currentPathPart.includes(']');
+      
+      let fieldNameToMatch = currentPathPart;
+      let arrayIndex = -1;
+      
+      if (hasArrayIndex) {
+        fieldNameToMatch = currentPathPart.split('[')[0];
+        arrayIndex = parseInt(currentPathPart.split('[')[1]?.split(']')[0] || '0');
+      }
+      
+      if (field.name === fieldNameToMatch) {
+        if (hasArrayIndex && field.items) {
+          const newItems = [...field.items];
+          if (newItems[arrayIndex]) {
+            if (pathParts.length === 2 && pathParts[1] === 'value') {
+              newItems[arrayIndex] = { ...newItems[arrayIndex], value };
+              return { ...field, items: newItems };
+            } else if (pathParts.length > 2) {
+              newItems[arrayIndex] = { ...newItems[arrayIndex], value };
+              return { ...field, items: newItems };
+            }
+          }
+          return field;
+        }
+        
         if (pathParts.length === 2 && pathParts[1] === 'value') {
           return { ...field, value };
-        } else if (pathParts.length === 2 && pathParts[1] === 'selectedVariant') {
+        } 
+        else if (pathParts.length === 2 && pathParts[1] === 'selectedVariant') {
           return { ...field, selectedVariant: value };
-        } else if (pathParts.length === 2 && pathParts[1] === 'enumVariants') {
+        } 
+        else if (pathParts.length === 2 && pathParts[1] === 'enumVariants') {
           return { ...field, enumVariants: value };
-        } else if (pathParts.length > 2 && field.nestedFields) {
-          return {
-            ...field,
-            nestedFields: updateFieldValue(field.nestedFields, pathParts.slice(1), value)
-          };
-        } else if (pathParts[1]?.includes('[') && field.items) {
-          const itemIndex = parseInt(pathParts[1].split('[')[1]?.split(']')[0] || '0');
-          const newItems = [...field.items];
-          if (newItems[itemIndex]) {
-            newItems[itemIndex] = { ...newItems[itemIndex], value };
-          }
-          return { ...field, items: newItems };
-        } else if (pathParts[1] === 'items' && pathParts.length === 2) {
-          // Handle direct setting of items array
+        }
+        else if (pathParts.length === 2 && pathParts[1] === 'tupleItems') {
+          return { ...field, tupleItems: value };
+        }
+        else if (pathParts[1] === 'items' && pathParts.length === 2) {
           return { ...field, items: value };
+        }
+        else if (pathParts.length > 1) {
+          if (field.nestedFields && field.nestedFields.length > 0) {
+            return {
+              ...field,
+              nestedFields: updateFieldValue(field.nestedFields, pathParts.slice(1), value)
+            };
+          }
+          else if (field.enumVariants && field.enumVariants.length > 0 && pathParts[1] && field.enumVariants.some(v => v.name === pathParts[1])) {
+            const updatedVariants = field.enumVariants.map(variant => {
+              if (variant.name === pathParts[1] && variant.nestedFields) {
+                return {
+                  ...variant,
+                  nestedFields: updateFieldValue(variant.nestedFields, pathParts.slice(2), value)
+                };
+              }
+              return variant;
+            });
+            return { ...field, enumVariants: updatedVariants };
+          }
+          else if (pathParts.length === 2 && pathParts[1] === 'value') {
+            return { ...field, value };
+          }
         }
       }
       return field;
@@ -361,7 +451,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   }, []);
 
   const isTupleType = useCallback((type: string): boolean => {
-    return type.startsWith('[') && type.endsWith(']') && type.includes(',');
+    return type.startsWith('[') && type.endsWith(']') && type.includes(',') || 
+           type.includes('Tuple.with');
   }, []);
 
   const isVecType = useCallback((type: string): boolean => {
@@ -374,29 +465,110 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
 
   const extractVecItemType = useCallback((vecType: string): string | undefined => {
     if (vecType.includes('Vec<')) {
-      const match = vecType.match(/Vec<([^>]+)>/);
-      return match ? match[1].trim() : undefined;
+      const startIndex = vecType.indexOf('Vec<') + 4;
+      let angleCount = 1;
+      let endIndex = startIndex;
+      
+      while (endIndex < vecType.length && angleCount > 0) {
+        if (vecType[endIndex] === '<') angleCount++;
+        else if (vecType[endIndex] === '>') angleCount--;
+        if (angleCount > 0) endIndex++;
+      }
+      
+      if (angleCount === 0) {
+        return vecType.substring(startIndex, endIndex).trim();
+      }
     }
+    
     if (vecType.includes('Vec.with')) {
       const match = vecType.match(/Vec\.with\s*\(\s*([^)]+)\s*\)/);
       return match ? match[1].trim() : undefined;
     }
+    
     if (vecType.includes('[]')) {
       return vecType.replace('[]', '').trim();
     }
+    
     return undefined;
   }, []);
 
   const parseTupleTypes = useCallback((tupleType: string): { type: string; value: any; index: number }[] => {
+    let innerTypes = '';
+    
     if (tupleType.startsWith('[') && tupleType.endsWith(']')) {
-      const innerTypes = tupleType.slice(1, -1);
-      return innerTypes.split(',').map((type, index) => ({
-        type: type.trim(),
-        value: '',
-        index: index
-      }));
+      // [Type1, Type2, ...]
+      innerTypes = tupleType.slice(1, -1);
+    } else if (tupleType.includes('Tuple.with')) {
+      // Tuple.with([Type1, Type2, ...])
+      const match = tupleType.match(/Tuple\.with\s*\(\s*\[([^\]]*)\]\s*\)/);
+      if (match) {
+        innerTypes = match[1];
+      } else {
+        console.warn('Failed to parse Tuple.with format:', tupleType);
+        return [];
+      }
     }
-    return [];
+    
+    if (!innerTypes) return [];
+    
+    const parseTypes = (typesStr: string): string[] => {
+      const types: string[] = [];
+      let currentType = '';
+      let bracketCount = 0;
+      let parenCount = 0;
+      let angleCount = 0;
+      let inString = false;
+      let stringChar = '';
+      
+      for (let i = 0; i < typesStr.length; i++) {
+        const char = typesStr[i];
+        const prevChar = i > 0 ? typesStr[i - 1] : '';
+        
+        // string
+        if ((char === '"' || char === "'") && prevChar !== '\\') {
+          if (!inString) {
+            inString = true;
+            stringChar = char;
+          } else if (char === stringChar) {
+            inString = false;
+            stringChar = '';
+          }
+        }
+        
+        if (!inString) {
+          if (char === '[') bracketCount++;
+          else if (char === ']') bracketCount--;
+          else if (char === '(') parenCount++;
+          else if (char === ')') parenCount--;
+          else if (char === '<') angleCount++;
+          else if (char === '>') angleCount--;
+          else if (char === ',' && bracketCount === 0 && parenCount === 0 && angleCount === 0) {
+            // find type separator
+            if (currentType.trim()) {
+              types.push(currentType.trim());
+            }
+            currentType = '';
+            continue;
+          }
+        }
+        
+        currentType += char;
+      }
+      
+      if (currentType.trim()) {
+        types.push(currentType.trim());
+      }
+      
+      return types;
+    };
+    
+    const types = parseTypes(innerTypes);
+    
+    return types.map((type, index) => ({
+      type: type.trim(),
+      value: '',
+      index: index
+    }));
   }, []);
 
   const getPlaceholder = useCallback((type: string): string => {
@@ -415,15 +587,67 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
 
   const parseStructFields = useCallback((structContent: string): DebugField[] => {
     const fields: DebugField[] = [];
-    const fieldRegex = /\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*([^;\n]+)/g;
-    let fieldMatch;
-
+    
     console.log('Parsing struct content:', structContent);
 
-    while ((fieldMatch = fieldRegex.exec(structContent)) !== null) {
-      const fieldName = fieldMatch[1];
-      const fieldType = fieldMatch[2].trim();
-
+    const parseFieldsWithBracketMatching = (content: string): DebugField[] => {
+      const fields: DebugField[] = [];
+      let currentField = '';
+      let bracketCount = 0;
+      let parenCount = 0;
+      let braceCount = 0;
+      let inString = false;
+      let stringChar = '';
+      
+      for (let i = 0; i < content.length; i++) {
+        const char = content[i];
+        const prevChar = i > 0 ? content[i - 1] : '';
+        
+        if ((char === '"' || char === "'") && prevChar !== '\\') {
+          if (!inString) {
+            inString = true;
+            stringChar = char;
+          } else if (char === stringChar) {
+            inString = false;
+            stringChar = '';
+          }
+        }
+        
+        if (!inString) {
+          if (char === '[') bracketCount++;
+          else if (char === ']') bracketCount--;
+          else if (char === '(') parenCount++;
+          else if (char === ')') parenCount--;
+          else if (char === '{') braceCount++;
+          else if (char === '}') braceCount--;
+          else if (char === ',' && bracketCount === 0 && parenCount === 0 && braceCount === 0) {
+            if (currentField.trim()) {
+              const field = parseField(currentField.trim());
+              if (field) fields.push(field);
+            }
+            currentField = '';
+            continue;
+          }
+        }
+        
+        currentField += char;
+      }
+      
+      if (currentField.trim()) {
+        const field = parseField(currentField.trim());
+        if (field) fields.push(field);
+      }
+      
+      return fields;
+    };
+    
+    const parseField = (fieldStr: string): DebugField | null => {
+      const colonIndex = fieldStr.indexOf(':');
+      if (colonIndex === -1) return null;
+      
+      const fieldName = fieldStr.substring(0, colonIndex).trim();
+      const fieldType = fieldStr.substring(colonIndex + 1).trim();
+      
       console.log(`Parsing field: ${fieldName} : ${fieldType}`);
       console.log(`Is Vec type: ${isVecType(fieldType)}`);
 
@@ -432,7 +656,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         console.log(`Vec field ${fieldName} item type: ${itemType}`);
       }
 
-      fields.push({
+      return {
         name: fieldName,
         type: fieldType,
         value: '',
@@ -449,12 +673,14 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         items: isVecType(fieldType) ? [{ value: '' }] : [],
         referencedStructName: undefined,
         referencedEnumName: undefined
-      });
-    }
+      };
+    };
 
-    console.log(`Total parsed ${fields.length} fields, including Vec fields: ${fields.filter(f => f.isVec).length}`);
+    const parsedFields = parseFieldsWithBracketMatching(structContent);
+    
+    console.log(`Total parsed ${parsedFields.length} fields, including Vec fields: ${parsedFields.filter(f => f.isVec).length}`);
 
-    return fields;
+    return parsedFields;
   }, [isVecType, isTupleType, isOptionType, extractVecItemType, parseTupleTypes]);
 
   const collectNestedStructData = useCallback((fields: DebugField[]): any => {
@@ -511,18 +737,68 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   }, []);
 
   const parseObjectFieldsToDebugFields = useCallback((objStr: string): DebugField[] => {
-    const fields: DebugField[] = [];
     const cleanedObj = objStr.replace(/[\s\n]+/g, ' ').trim();
     const innerContent = cleanedObj.slice(1, -1);
 
-    const fieldRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*([^,}]+)/g;
-    let match;
+    const parseFieldsWithBracketMatching = (content: string): DebugField[] => {
+      const fields: DebugField[] = [];
+      let currentField = '';
+      let bracketCount = 0;
+      let parenCount = 0;
+      let braceCount = 0;
+      let inString = false;
+      let stringChar = '';
+      
+      for (let i = 0; i < content.length; i++) {
+        const char = content[i];
+        const prevChar = i > 0 ? content[i - 1] : '';
+        
+        if ((char === '"' || char === "'") && prevChar !== '\\') {
+          if (!inString) {
+            inString = true;
+            stringChar = char;
+          } else if (char === stringChar) {
+            inString = false;
+            stringChar = '';
+          }
+        }
+        
+        if (!inString) {
+          if (char === '[') bracketCount++;
+          else if (char === ']') bracketCount--;
+          else if (char === '(') parenCount++;
+          else if (char === ')') parenCount--;
+          else if (char === '{') braceCount++;
+          else if (char === '}') braceCount--;
+          else if (char === ',' && bracketCount === 0 && parenCount === 0 && braceCount === 0) {
+            if (currentField.trim()) {
+              const field = parseField(currentField.trim());
+              if (field) fields.push(field);
+            }
+            currentField = '';
+            continue;
+          }
+        }
+        
+        currentField += char;
+      }
+      
+      if (currentField.trim()) {
+        const field = parseField(currentField.trim());
+        if (field) fields.push(field);
+      }
+      
+      return fields;
+    };
+    
+    const parseField = (fieldStr: string): DebugField | null => {
+      const colonIndex = fieldStr.indexOf(':');
+      if (colonIndex === -1) return null;
+      
+      const fieldName = fieldStr.substring(0, colonIndex).trim();
+      const fieldType = fieldStr.substring(colonIndex + 1).trim();
 
-    while ((match = fieldRegex.exec(innerContent)) !== null) {
-      const fieldName = match[1].trim();
-      const fieldType = match[2].trim();
-
-      fields.push({
+      return {
         name: fieldName,
         type: fieldType,
         value: '',
@@ -539,10 +815,10 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         items: isVecType(fieldType) ? [{ value: '' }] : [],
         referencedStructName: undefined,
         referencedEnumName: undefined
-      });
-    }
+      };
+    };
 
-    return fields;
+    return parseFieldsWithBracketMatching(innerContent);
   }, [isVecType, isTupleType, isOptionType, extractVecItemType, parseTupleTypes]);
 
   const parseEnumMembers = useCallback((enumContent: string): DebugVariant[] => {
@@ -642,18 +918,67 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     const parseStructFieldsFromString = (fieldsStr: string): DebugField[] => {
       console.log('parse fields string:', `"${fieldsStr}"`);
 
-      const fields: DebugField[] = [];
-
-      const fieldRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*([^,\n\r}]+)/g;
-      let fieldMatch;
-
-      while ((fieldMatch = fieldRegex.exec(fieldsStr)) !== null) {
-        const fieldName = fieldMatch[1].trim();
-        const fieldType = fieldMatch[2].trim();
+      const parseFieldsWithBracketMatching = (content: string): DebugField[] => {
+        const fields: DebugField[] = [];
+        let currentField = '';
+        let bracketCount = 0;
+        let parenCount = 0;
+        let braceCount = 0;
+        let inString = false;
+        let stringChar = '';
+        
+        for (let i = 0; i < content.length; i++) {
+          const char = content[i];
+          const prevChar = i > 0 ? content[i - 1] : '';
+          
+          if ((char === '"' || char === "'") && prevChar !== '\\') {
+            if (!inString) {
+              inString = true;
+              stringChar = char;
+            } else if (char === stringChar) {
+              inString = false;
+              stringChar = '';
+            }
+          }
+          
+          if (!inString) {
+            if (char === '[') bracketCount++;
+            else if (char === ']') bracketCount--;
+            else if (char === '(') parenCount++;
+            else if (char === ')') parenCount--;
+            else if (char === '{') braceCount++;
+            else if (char === '}') braceCount--;
+            else if (char === ',' && bracketCount === 0 && parenCount === 0 && braceCount === 0) {
+              if (currentField.trim()) {
+                const field = parseField(currentField.trim());
+                if (field) fields.push(field);
+              }
+              currentField = '';
+              continue;
+            }
+          }
+          
+          currentField += char;
+        }
+        
+        if (currentField.trim()) {
+          const field = parseField(currentField.trim());
+          if (field) fields.push(field);
+        }
+        
+        return fields;
+      };
+      
+      const parseField = (fieldStr: string): DebugField | null => {
+        const colonIndex = fieldStr.indexOf(':');
+        if (colonIndex === -1) return null;
+        
+        const fieldName = fieldStr.substring(0, colonIndex).trim();
+        const fieldType = fieldStr.substring(colonIndex + 1).trim();
 
         console.log(`parse field: ${fieldName} : ${fieldType}`);
 
-        fields.push({
+        return {
           name: fieldName,
           type: fieldType,
           value: '',
@@ -670,11 +995,12 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           items: isVecType(fieldType) ? [{ value: '' }] : [],
           referencedStructName: undefined,
           referencedEnumName: undefined
-        });
-      }
+        };
+      };
 
-      console.log(`parse fields number: ${fields.length}`);
-      return fields;
+      const parsedFields = parseFieldsWithBracketMatching(fieldsStr);
+      console.log(`parse fields number: ${parsedFields.length}`);
+      return parsedFields;
     };
 
     const parseVecWith = (vecWithStr: string): string => {
@@ -750,7 +1076,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     console.log(`parse enum variants number: ${variants.length}, variants:`, variants.map(v => `${v.name}${v.hasValue ? `(${v.type})` : '(Null)'}`).join(', '));
 
     return variants;
-  }, []);
+  }, [isVecType, isTupleType, isOptionType, extractVecItemType, parseTupleTypes]);
 
   const extractAndDefineClasses = useCallback((code: string): ExtractedClass[] => {
     if (!code || typeof code !== 'string') return [];
@@ -1587,7 +1913,25 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       return constructorType;
     }
 
-    // pattern2: new TypeName(registry, paramName) - 2-param constructor
+    // pattern2: new Tuple(registry, [Type1, Type2, ...], [param1, param2, ...]) - Tuple constructor
+    const tuplePattern = new RegExp(`new\\s+Tuple\\s*\\(\\s*registry\\s*,\\s*\\[([^\\]]+)\\]\\s*,\\s*\\[([^\\]]+)\\]\\s*\\)`, 'g');
+    match = tuplePattern.exec(functionBody);
+    if (match) {
+      const typeArray = match[1]; // Text, Text
+      const paramArray = match[2]; // aArg, bArg
+      
+      const params = paramArray.split(',').map(p => p.trim());
+      const types = typeArray.split(',').map(t => t.trim());
+      
+      const paramIndex = params.findIndex(p => p === paramName);
+      if (paramIndex !== -1 && paramIndex < types.length) {
+        const paramType = types[paramIndex];
+        console.log(`  ✅ Found Tuple pattern: ${paramName} -> ${paramType} (index ${paramIndex})`);
+        return paramType;
+      }
+    }
+
+    // pattern3: new TypeName(registry, paramName) - 2-param constructor
     const twoParamConstructorPattern = new RegExp(`new\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*registry\\s*,\\s*${paramName}\\s*\\)`, 'g');
     match = twoParamConstructorPattern.exec(functionBody);
     if (match) {
@@ -1595,7 +1939,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       return constructorType;
     }
 
-    // pattern3: new SomeType(registry, typeArg, paramName) - case insensitive
+    // pattern4: new SomeType(registry, typeArg, paramName) - case insensitive
     const constructorPattern2 = new RegExp(`new\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*[^,]+\\s*,\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*,\\s*${paramName}\\s*\\)`, 'gi');
     match = constructorPattern2.exec(functionBody);
     if (match) {
@@ -1604,28 +1948,28 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       return typeArg;
     }
 
-    // pattern4: paramName as SomeType
+    // pattern5: paramName as SomeType
     const asPattern = new RegExp(`${paramName}\\s+as\\s+([A-Za-z_$][A-Za-z0-9_$<>\\[\\]]+)`, 'g');
     match = asPattern.exec(functionBody);
     if (match) {
       return match[1];
     }
 
-    // pattern5: (paramName: SomeType)
+    // pattern6: (paramName: SomeType)
     const typeAnnotationPattern = new RegExp(`\\(\\s*${paramName}\\s*:\\s*([A-Za-z_$][A-Za-z0-9_$<>\\[\\]]+)\\s*\\)`, 'g');
     match = typeAnnotationPattern.exec(functionBody);
     if (match) {
       return match[1];
     }
 
-    // pattern6: SomeType.from(paramName) or SomeType.create(paramName)
+    // pattern7: SomeType.from(paramName) or SomeType.create(paramName)
     const factoryPattern = new RegExp(`([A-Za-z_$][A-Za-z0-9_$]*)\\.(?:from|create|with)\\s*\\(\\s*[^,]*${paramName}`, 'g');
     match = factoryPattern.exec(functionBody);
     if (match) {
       return match[1];
     }
 
-    // pattern7: more loose constructor pattern, support multi-param - const something = new Type(registry, SomeArg, paramName, ...)
+    // pattern8: more loose constructor pattern, support multi-param - const something = new Type(registry, SomeArg, paramName, ...)
     const looseConstructorPattern = new RegExp(`new\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\([^)]*${paramName}[^)]*\\)`, 'g');
     match = looseConstructorPattern.exec(functionBody);
     if (match) {
@@ -1741,43 +2085,67 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     setCurrentCode(tsCode);
   }, [tsCode]);
 
-  // New useEffect to handle nested structure parsing
+  const resolveNestedFieldTypes = useCallback((fields: DebugField[], extractedClasses: ExtractedClass[], depth = 0): DebugField[] => {
+    if (depth > 10) {
+      console.warn('Maximum nesting depth reached, stopping recursion');
+      return fields;
+    }
+
+    return fields.map(field => {
+      const isStruct = isCustomType(field.type) &&
+        extractedClasses.some(c => c.name === field.type && c.type === 'Struct');
+
+      const isEnum = isCustomType(field.type) &&
+        extractedClasses.some(c => c.name === field.type && c.type === 'Enum');
+
+      if (isStruct && !field.isStruct) {
+        // Handle Struct type references
+        const structClass = extractedClasses.find(c => c.name === field.type && c.type === 'Struct');
+        const resolvedNestedFields = structClass?.fields ? 
+          resolveNestedFieldTypes(JSON.parse(JSON.stringify(structClass.fields)), extractedClasses, depth + 1) : [];
+        
+        return {
+          ...field,
+          isStruct: true,
+          referencedStructName: field.type,
+          nestedFields: resolvedNestedFields
+        };
+      } else if (isEnum && !field.isEnum) {
+        // Handle Enum type references
+        const enumClass = extractedClasses.find(c => c.name === field.type && c.type === 'Enum');
+        const resolvedVariants = enumClass?.variants ? 
+          enumClass.variants.map(variant => ({
+            ...variant,
+            nestedFields: variant.nestedFields ? 
+              resolveNestedFieldTypes(variant.nestedFields, extractedClasses, depth + 1) : undefined
+          })) : [];
+        
+        return {
+          ...field,
+          isEnum: true,
+          referencedEnumName: field.type,
+          enumVariants: resolvedVariants
+        };
+      } else if (field.nestedFields && field.nestedFields.length > 0) {
+        return {
+          ...field,
+          nestedFields: resolveNestedFieldTypes(field.nestedFields, extractedClasses, depth + 1)
+        };
+      }
+      
+      return field;
+    });
+  }, [isCustomType]);
+
+  // handle nested structure parsing
   useEffect(() => {
     if (extractedClasses.length > 0) {
       const resolvedClasses = extractedClasses.map(cls => {
         if (cls.type === 'Struct' && cls.fields) {
-          const resolvedFields = cls.fields.map(field => {
-            const isStruct = isCustomType(field.type) &&
-              extractedClasses.some(c => c.name === field.type && c.type === 'Struct');
-
-            const isEnum = isCustomType(field.type) &&
-              extractedClasses.some(c => c.name === field.type && c.type === 'Enum');
-
-            if (isStruct && !field.isStruct) { // Handle Struct type references
-              const structClass = extractedClasses.find(c => c.name === field.type && c.type === 'Struct');
-              return {
-                ...field,
-                isStruct: true,
-                referencedStructName: field.type,
-                nestedFields: structClass?.fields ? JSON.parse(JSON.stringify(structClass.fields)) : []
-              };
-            } else if (isEnum && !field.isEnum) { // Handle Enum type references
-              const enumClass = extractedClasses.find(c => c.name === field.type && c.type === 'Enum');
-              return {
-                ...field,
-                isEnum: true,
-                referencedEnumName: field.type,
-                enumVariants: enumClass?.variants ? JSON.parse(JSON.stringify(enumClass.variants)) : []
-              };
-            }
-            return field;
-          });
+          const resolvedFields = resolveNestedFieldTypes(cls.fields, extractedClasses);
 
           // Check if any fields have been updated
-          const hasChanges = resolvedFields.some((field, index) =>
-            field.isStruct !== cls.fields![index]?.isStruct ||
-            field.isEnum !== cls.fields![index]?.isEnum
-          );
+          const hasChanges = JSON.stringify(resolvedFields) !== JSON.stringify(cls.fields);
 
           if (hasChanges) {
             return {
@@ -1790,12 +2158,16 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       });
 
       // Only update state when there are actual changes
-      const hasAnyChanges = resolvedClasses.some((cls, index) => cls !== extractedClasses[index]);
+      const hasAnyChanges = resolvedClasses.some((cls, index) => 
+        JSON.stringify(cls) !== JSON.stringify(extractedClasses[index])
+      );
+      
       if (hasAnyChanges) {
+        console.log('Updating extractedClasses with resolved nested types');
         setExtractedClasses(resolvedClasses);
       }
     }
-  }, [extractedClasses, isCustomType]);
+  }, [extractedClasses, resolveNestedFieldTypes]);
 
   useEffect(() => {
     if (extractedClasses.length > 0) {
@@ -1807,39 +2179,14 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
 
         const updatedFunctions = prevFunctions.map(func => {
           if (func.debugInputs) {
-            const updatedDebugInputs = func.debugInputs.map(input => {
-              const referencedStruct = extractedClasses.find(c => c.name === input.type && c.type === 'Struct');
-              const referencedEnum = extractedClasses.find(c => c.name === input.type && c.type === 'Enum');
-              
-              if (referencedStruct && !input.isStruct) {
-                return {
-                  ...input,
-                  isStruct: true,
-                  referencedStructName: input.type,
-                  nestedFields: referencedStruct.fields ? JSON.parse(JSON.stringify(referencedStruct.fields)) : []
-                };
-              } else if (referencedEnum && !input.isEnum) {
-                return {
-                  ...input,
-                  isEnum: true,
-                  referencedEnumName: input.type,
-                  enumVariants: referencedEnum.variants ? JSON.parse(JSON.stringify(referencedEnum.variants)) : []
-                };
-              }
-              return input;
-            });
+            const resolvedDebugInputs = resolveNestedFieldTypes(func.debugInputs, extractedClasses);
 
-            const hasChanges = updatedDebugInputs.some((input, index) =>
-              input.isStruct !== func.debugInputs![index]?.isStruct ||
-              input.isEnum !== func.debugInputs![index]?.isEnum ||
-              (input.nestedFields?.length || 0) !== (func.debugInputs![index]?.nestedFields?.length || 0) ||
-              (input.enumVariants?.length || 0) !== (func.debugInputs![index]?.enumVariants?.length || 0)
-            );
+            const hasChanges = JSON.stringify(resolvedDebugInputs) !== JSON.stringify(func.debugInputs);
 
             if (hasChanges) {
               return {
                 ...func,
-                debugInputs: updatedDebugInputs
+                debugInputs: resolvedDebugInputs
               };
             }
           }
@@ -1848,17 +2195,18 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
 
         const hasAnyChanges = updatedFunctions.some((func, index) => {
           const originalFunc = prevFunctions[index];
-          return func !== originalFunc;
+          return JSON.stringify(func) !== JSON.stringify(originalFunc);
         });
         
         if (hasAnyChanges) {
+          console.log('Updating functions with resolved nested types');
           return updatedFunctions;
         } else {
           return prevFunctions;
         }
       });
     }
-  }, [extractedClasses]);
+  }, [extractedClasses, resolveNestedFieldTypes]);
 
   const renderFieldInput = useCallback((
     field: DebugField,
