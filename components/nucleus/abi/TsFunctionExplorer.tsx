@@ -1980,7 +1980,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
               </Chip>
             )}
           </div>
-          <div className="border-l-2 border-blue-200 pl-4" style={{ marginLeft: `${indent + 10}px` }}>
+          <div className="border-l-2 border-blue-200 pl-4 space-y-1" style={{ marginLeft: `${indent + 10}px` }}>
             {field.nestedFields.map((nestedField, nestedIndex) =>
               renderFieldInput(nestedField, classIndex, `${fieldPath}.${nestedField.name}`, level + 1, context)
             )}
@@ -2762,7 +2762,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                                 <Chip size="sm" variant="flat" color="warning">Optional</Chip>
                               )}
                               {param.customTypeName && (
-                                <Chip size="sm" variant="flat" color="success">Custom: {param.customTypeName}</Chip>
+                                <Chip size="sm" variant="flat" color="success">{param.customTypeName}</Chip>
                               )}
                             </div>
                           ))}
