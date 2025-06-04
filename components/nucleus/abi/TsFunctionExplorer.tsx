@@ -63,6 +63,14 @@ interface ExtractedClass {
   itemType?: string;
   length?: number;
   vecValues?: string[];
+  constructorParams?: {
+    original: string;
+    T: string;
+    S: string;
+    value?: string;
+    argsFieldsCount: number;
+    parseStatus: 'success' | 'failed';
+  };
 }
 
 interface DebugField {
@@ -97,10 +105,6 @@ interface DebugVariant {
 export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFunctionExplorerProps) {
   const [functions, setFunctions] = useState<ParsedFunction[]>([]);
   const [extractedClasses, setExtractedClasses] = useState<ExtractedClass[]>([]);
-  const [selectedFunction, setSelectedFunction] = useState<ParsedFunction | null>(null);
-  const [functionInputs, setFunctionInputs] = useState<Record<string, any>>({});
-  const [result, setResult] = useState<string>("");
-  const [loading, setLoading] = useState(false);
   const [currentCode, setCurrentCode] = useState<string>(tsCode);
 
   const toggleDebugMode = useCallback((index: number) => {
@@ -114,17 +118,192 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       if (i === functionIndex) {
         const debugMode = !func.debugMode;
         if (debugMode && !func.debugInputs) {
-          // Initialize debug inputs when enabling debug mode
-          const debugInputs = func.parameters.map(param => 
-            convertParameterToDebugField(param)
-          );
+          
+          console.log(`🔍 为函数 ${func.name} 创建调试输入，参数数量: ${func.parameters.length}`);
+          console.log(`  可用的 extractedClasses: [${extractedClasses.map(c => `${c.name}(${c.type})`).join(', ')}]`);
+          
+          const debugInputs = func.parameters.map(param => {
+            console.log(`  📝 处理参数: ${param.name} : ${param.type}`);
+            
+            console.log(`    🔍 查找参数类型 ${param.type} 在 extractedClasses 中的定义...`);
+            
+            const referencedStruct = extractedClasses.find(c => c.name === param.type && c.type === 'Struct');
+            const referencedEnum = extractedClasses.find(c => c.name === param.type && c.type === 'Enum');
+            
+            console.log(`    查找结果: referencedStruct=${referencedStruct?.name || 'null'}, referencedEnum=${referencedEnum?.name || 'null'}`);
+            console.log(`    详细查找结果: referencedStruct=`, referencedStruct);
+            
+            // 检查是否是自定义类型
+            const isCustom = /^[A-Z]/.test(param.type) && !['String', 'Number', 'Boolean', 'Array'].includes(param.type);
+            console.log(`    isCustom=${isCustom}, param.type=${param.type}`);
+            
+            const baseField: DebugField = {
+              name: param.name,
+              type: param.type,
+              value: '',
+              isVec: param.type.includes('Vec<') || param.type.includes('[]'),
+              isTuple: param.type.startsWith('[') && param.type.endsWith(']') && param.type.includes(','),
+              isOption: param.type.includes('Option<'),
+              isStruct: !!referencedStruct,
+              isEnum: !!referencedEnum,
+              itemType: undefined,
+              tupleItems: [],
+              nestedFields: [],
+              enumVariants: [],
+              hasValue: false,
+              items: (param.type.includes('Vec<') || param.type.includes('[]')) ? [{ value: '' }] : [],
+              referencedStructName: referencedStruct?.name,
+              referencedEnumName: referencedEnum?.name
+            };
+
+            console.log(`    baseField 初始化完成: isStruct=${baseField.isStruct}, referencedStructName=${baseField.referencedStructName}`);
+
+            // Struct type, copy its field structure
+            if (referencedStruct && referencedStruct.fields) {
+              console.log(`    ✓ 复制 Struct ${referencedStruct.name} 的字段结构，字段数: ${referencedStruct.fields.length}`);
+              baseField.nestedFields = JSON.parse(JSON.stringify(referencedStruct.fields));
+              console.log(`    ✓ 字段复制完成，baseField.nestedFields 长度: ${baseField.nestedFields?.length || 0}`);
+              
+              // 特殊处理：如果这是通过类型推断得到的容器类型，使用缓存的类型信息替换参数
+              const typeCache = (window as any).__typeInferenceCache;
+              const innerTypeKey = `${func.name}_${param.name}_${param.type}_innerType`;
+              if (typeCache && typeCache[innerTypeKey]) {
+                const innerType = typeCache[innerTypeKey];
+                console.log(`    🔧 发现类型推断缓存，替换 T 参数: ${innerType}`);
+                
+                // 对于 Args 类型，替换字段类型中的 T 和 S 参数
+                if (baseField.nestedFields && referencedStruct.baseType === 'Args') {
+                  console.log(`    🔧 这是 Args 继承类型，开始替换字段类型参数...`);
+                  baseField.nestedFields = baseField.nestedFields.map(field => {
+                    let newType = field.type;
+                    if (field.type === 'T') {
+                      newType = innerType;
+                      console.log(`      ✓ 替换字段 ${field.name} 类型: T -> ${innerType}`);
+                    }
+                    // S 参数应该已经在解析时被替换了，但以防万一
+                    if (field.type === 'S' && referencedStruct.constructorParams?.S) {
+                      newType = referencedStruct.constructorParams.S;
+                      console.log(`      ✓ 替换字段 ${field.name} 类型: S -> ${referencedStruct.constructorParams.S}`);
+                    }
+                    
+                    // 类型替换后，检查新类型是否是结构体或枚举
+                    let updatedField = {
+                      ...field,
+                      type: newType
+                    };
+                    
+                    // 如果新类型是结构体类型，设置嵌套字段
+                    if (newType !== field.type) {
+                      console.log(`      🔍 检查替换后的类型 ${newType} 是否是结构体/枚举...`);
+                      const newTypeStruct = extractedClasses.find(c => c.name === newType && c.type === 'Struct');
+                      const newTypeEnum = extractedClasses.find(c => c.name === newType && c.type === 'Enum');
+                      
+                      if (newTypeStruct && newTypeStruct.fields) {
+                        console.log(`      ✓ ${newType} 是结构体类型，设置嵌套字段 (${newTypeStruct.fields.length} 个字段)`);
+                        updatedField.isStruct = true;
+                        updatedField.referencedStructName = newType;
+                        updatedField.nestedFields = JSON.parse(JSON.stringify(newTypeStruct.fields));
+                      } else if (newTypeEnum && newTypeEnum.variants) {
+                        console.log(`      ✓ ${newType} 是枚举类型，设置变体 (${newTypeEnum.variants.length} 个变体)`);
+                        updatedField.isEnum = true;
+                        updatedField.referencedEnumName = newType;
+                        updatedField.enumVariants = JSON.parse(JSON.stringify(newTypeEnum.variants));
+                      } else {
+                        console.log(`      ℹ️ ${newType} 不是结构体或枚举类型`);
+                      }
+                    }
+                    
+                    return updatedField;
+                  });
+                  console.log(`    ✅ 字段类型替换完成`);
+                }
+              } else {
+                console.log(`    ℹ️ 未找到类型推断缓存信息 (键: ${innerTypeKey})`);
+              }
+            } else if (referencedStruct && !referencedStruct.fields) {
+              console.log(`    ⚠️ 找到 Struct ${referencedStruct.name} 但没有字段定义`);
+            }
+
+            // Enum type, copy its variant structure
+            if (referencedEnum && referencedEnum.variants) {
+              console.log(`    ✓ 复制 Enum ${referencedEnum.name} 的变体结构，变体数: ${referencedEnum.variants.length}`);
+              baseField.enumVariants = JSON.parse(JSON.stringify(referencedEnum.variants));
+            }
+
+            // 添加诊断信息
+            if (isCustom && !referencedStruct && !referencedEnum) {
+              console.log(`    ⚠️ 诊断: 参数 ${param.name} 的类型 ${param.type} 是自定义类型但在 extractedClasses 中找不到定义`);
+              console.log(`    建议检查:`);
+              console.log(`    1. 代码中是否包含 ${param.type} 的定义 (class/interface/type)`);
+              console.log(`    2. 类型定义的格式是否符合解析器的要求`);
+              console.log(`    3. 可用的类型列表: [${extractedClasses.map(c => c.name).join(', ')}]`);
+              
+              // 特殊处理：检查是否是 SignedArgs 类型的容器类型
+              const typeCache = (window as any).__typeInferenceCache;
+              const innerTypeKey = `${func.name}_${param.name}_${param.type}_innerType`;
+              if (typeCache && typeCache[innerTypeKey]) {
+                const innerType = typeCache[innerTypeKey];
+                console.log(`    ✓ 发现容器类型 ${param.type}，内部类型: ${innerType} (缓存键: ${innerTypeKey})`);
+                
+                // 直接查找容器类型的定义（如 SignedArgs）
+                const containerStruct = extractedClasses.find(c => c.name === param.type && c.type === 'Struct');
+                if (containerStruct && containerStruct.fields) {
+                  console.log(`    ✓ 找到容器类型 ${param.type} 的完整定义，使用其完整结构`);
+                  
+                  // 使用完整的 SignedArgs 结构，而不是创建包装
+                  baseField.isStruct = true;
+                  baseField.referencedStructName = param.type;
+                  baseField.nestedFields = JSON.parse(JSON.stringify(containerStruct.fields));
+                  
+                  console.log(`    ✓ 为参数 ${param.name} 使用 ${param.type} 的完整结构，字段数: ${baseField.nestedFields?.length || 0}`);
+                } else {
+                  console.log(`    ⚠️ 未找到容器类型 ${param.type} 的完整定义，回退到简单包装`);
+                  
+                  // 查找内部类型的定义
+                  const innerStruct = extractedClasses.find(c => c.name === innerType && c.type === 'Struct');
+                  const innerEnum = extractedClasses.find(c => c.name === innerType && c.type === 'Enum');
+                  
+                  if (innerStruct || innerEnum) {
+                    console.log(`    ✓ 找到内部类型 ${innerType} 的定义，创建简单包装结构`);
+                    
+                    // 为容器类型创建特殊的字段结构
+                    baseField.isStruct = true;
+                    baseField.referencedStructName = param.type;
+                    
+                    // 创建包含内部类型的嵌套字段
+                    baseField.nestedFields = [{
+                      name: 'value',
+                      type: innerType,
+                      value: '',
+                      isVec: false,
+                      isTuple: false,
+                      isOption: false,
+                      isStruct: !!innerStruct,
+                      isEnum: !!innerEnum,
+                      nestedFields: innerStruct?.fields ? JSON.parse(JSON.stringify(innerStruct.fields)) : [],
+                      enumVariants: innerEnum?.variants ? JSON.parse(JSON.stringify(innerEnum.variants)) : [],
+                      referencedStructName: innerStruct?.name,
+                      referencedEnumName: innerEnum?.name,
+                      hasValue: false,
+                      items: []
+                    }];
+                    
+                    console.log(`    ✓ 为容器类型 ${param.type} 创建了简单包装结构`);
+                  }
+                }
+              }
+            }
+
+            return baseField;
+          });
+          
           return { ...func, debugMode, debugInputs };
         }
         return { ...func, debugMode };
       }
       return func;
     }));
-  }, []);
+  }, [extractedClasses]);
 
   const updateFunctionInput = useCallback((functionIndex: number, fieldPath: string, value: any) => {
     setFunctions(prev => prev.map((func, i) => {
@@ -285,27 +464,6 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     return [];
   }, []);
 
-  const convertParameterToDebugField = useCallback((param: Parameter): DebugField => {
-    return {
-      name: param.name,
-      type: param.type,
-      value: '',
-      isVec: isVecType(param.type),
-      isTuple: isTupleType(param.type),
-      isOption: isOptionType(param.type),
-      isStruct: false,
-      isEnum: false,
-      itemType: isVecType(param.type) ? extractVecItemType(param.type) : undefined,
-      tupleItems: isTupleType(param.type) ? parseTupleTypes(param.type) : [],
-      nestedFields: [],
-      enumVariants: [],
-      hasValue: false,
-      items: isVecType(param.type) ? [{ value: '' }] : [],
-      referencedStructName: undefined,
-      referencedEnumName: undefined
-    };
-  }, [isVecType, isTupleType, isOptionType, extractVecItemType, parseTupleTypes]);
-
   const getPlaceholder = useCallback((type: string): string => {
     if (type.includes('number') || type.includes('bigint') || /u\d+|i\d+/.test(type)) {
       return '0';
@@ -368,6 +526,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     const data: any = {};
 
     fields.forEach(field => {
+      
       if (field.isVec && field.items && field.items.length > 0) {
         // Handle Vec type fields
         const vecValues = field.items
@@ -387,6 +546,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         const nestedData = collectNestedStructData(field.nestedFields);
         if (Object.keys(nestedData).length > 0) {
           data[field.name] = nestedData;
+        } else {
         }
       } else if (field.isEnum && field.selectedVariant) {
         // Handle Enum fields
@@ -401,9 +561,18 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       } else if (field.value !== '') {
         // Handle normal fields
         data[field.name] = field.value;
+        
+        // 特殊处理：如果这是一个应该是 Struct 的字段但没有被正确识别
+        if (!field.isStruct && !field.isEnum && !field.isVec && field.type && /^[A-Z]/.test(field.type)) {
+          console.log(`  ⚠️ warning: field ${field.name} type is ${field.type}, maybe should be complex type but treated as simple type`);
+          console.log(`  check if ${field.type} is defined in extractedClasses`);
+        }
+      } else {
+        console.log(`  - skip empty value field ${field.name}`);
       }
     });
 
+    console.log('final collected data:', data);
     return data;
   }, []);
 
@@ -454,31 +623,6 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         type: value ? (isNaN(Number(value)) ? 'string' : 'number') : undefined,
         hasValue: !!value,
         value: value || ''
-      });
-    }
-
-    return variants;
-  }, []);
-
-  const parseObjectFieldsToVariants = useCallback((objStr: string): DebugVariant[] => {
-    const variants: DebugVariant[] = [];
-    const cleanedObj = objStr.replace(/[\s\n]+/g, ' ').trim();
-    const innerContent = cleanedObj.slice(1, -1);
-
-    const variantRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*([^,}]+)/g;
-    let match;
-
-    while ((match = variantRegex.exec(innerContent)) !== null) {
-      const variantName = match[1].trim();
-      const variantType = match[2].trim();
-
-      const hasValue = variantType !== 'null' && variantType !== 'Null';
-
-      variants.push({
-        name: variantName,
-        type: hasValue ? variantType : undefined,
-        hasValue: hasValue,
-        value: ''
       });
     }
 
@@ -677,9 +821,10 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   const extractAndDefineClasses = useCallback((code: string): ExtractedClass[] => {
     if (!code || typeof code !== 'string') return [];
 
-    const extractedClasses: ExtractedClass[] = [];
+    console.log(`🏗️ 开始解析类定义，代码长度: ${code.length}`);
+    console.log(`🏗️ 代码内容预览: ${code.substring(0, 500)}...`);
 
-    console.log('start parse code, code length:', code.length);
+    const extractedClasses: ExtractedClass[] = [];
 
     // Parse TypeScript struct type definition - enhanced regex
     const structTypeDefRegex = /type\s+([A-Za-z_$][A-Za-z0-9_]*)\s*=\s*\{([^}]*)\}/gi;
@@ -829,11 +974,15 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     let classStartMatch;
     let classCount = 0;
 
+    console.log(`🔍 开始搜索类定义...`);
+
     while ((classStartMatch = classStartRegex.exec(code)) !== null) {
       const className = classStartMatch[1];
       const extendsType = classStartMatch[2];
       const classStartIndex = classStartMatch.index;
       const contentStartIndex = classStartMatch.index + classStartMatch[0].length;
+
+      console.log(`🎯 找到类: ${className} extends ${extendsType}`);
 
       // manually find matching closing brace
       let braceCount = 1;
@@ -856,23 +1005,299 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
 
       if (braceCount === 0) {
         classCount++;
+        console.log(`  ✅ 成功解析类 ${className}，内容长度: ${classContent.length}`);
+        
         // special handling for classes that inherit Args
         if (extendsType === 'Args') {
-          // parse Args class super call
-          const superMatch = classContent.match(/super\s*\(\s*registry\s*,\s*([^,]+)\s*,\s*([^,]+)\s*(?:,\s*value)?\s*\)/);
-          if (superMatch) {
-            const T = superMatch[1].trim();
-            const S = superMatch[2].trim();
+          console.log(`  🎯 这是一个 Args 继承类: ${className}`);
+          // 解析子类构造函数的参数和super调用
+          const constructorMatch = classContent.match(/constructor\s*\(\s*([^)]*)\)\s*\{([^}]*)\}/s);
+          if (constructorMatch) {
+            const constructorParams = constructorMatch[1];
+            const constructorBody = constructorMatch[2];
+            
+            console.log(`解析 ${className} 构造函数参数: ${constructorParams}`);
+            
+            // 解析 super 调用，支持更灵活的格式
+            const superMatch = constructorBody.match(/super\s*\(\s*registry\s*,\s*([^,]+)\s*,\s*([^,\)]+)\s*(?:,\s*([^)]+))?\s*\)/);
+            if (superMatch) {
+              const param1 = superMatch[1].trim(); // T 参数
+              const param2 = superMatch[2].trim(); // S 参数  
+              const param3 = superMatch[3]?.trim(); // value 参数（可选）
+              
+              console.log(`发现 Args 继承类: ${className}`);
+              console.log(`  参数1 (T): ${param1}`);
+              console.log(`  参数2 (S): ${param2}`);
+              if (param3) {
+                console.log(`  参数3 (value): ${param3}`);
+              }
 
-            extractedClasses.push({
-              name: className,
-              type: 'Args',
-              definition: `class ${className} extends Args`,
-              debugMode: false,
-              debugResult: '',
-              baseType: 'Args',
-              valueType: `T: ${T}, S: ${S}`
-            });
+              // 查找 Args 基类的定义来获取结构
+              const argsClassMatch = code.match(/class\s+Args\s+extends\s+Struct\s*\{([^}]*)\}/s);
+              let argsFields: DebugField[] = [];
+
+              if (argsClassMatch) {
+                const argsClassContent = argsClassMatch[1];
+                console.log(`找到 Args 基类，内容长度: ${argsClassContent.length} 字符`);
+                console.log(`Args 类内容预览: ${argsClassContent.substring(0, 200)}...`);
+                
+                // 解析 Args 构造函数中的 super 调用，支持多行格式
+                const argsSuperMatch = argsClassContent.match(/super\s*\(\s*registry\s*,\s*\{([^}]*)\}\s*(?:,\s*value)?\s*\)/s);
+                
+                if (argsSuperMatch) {
+                  const structDefinition = argsSuperMatch[1];
+                  console.log(`找到 Args 基类结构定义: ${structDefinition.replace(/\s+/g, ' ')}`);
+                  
+                  // 解析结构字段，支持参数替换
+                  const fieldRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*([^,\n}]+)/g;
+                  let fieldMatch;
+                  
+                  while ((fieldMatch = fieldRegex.exec(structDefinition)) !== null) {
+                    const fieldName = fieldMatch[1].trim();
+                    let fieldType = fieldMatch[2].trim();
+                    
+                    // 记录原始类型用于显示
+                    const originalType = fieldType;
+                    
+                    // 替换参数：T -> 实际传入的参数值，S -> 实际传入的参数值
+                    if (fieldType === 'T') {
+                      fieldType = param1;
+                    } else if (fieldType === 'S') {
+                      fieldType = param2;
+                    }
+                    
+                    console.log(`解析 Args 字段: ${fieldName} : ${originalType} -> ${fieldType}`);
+                    
+                    argsFields.push({
+                      name: fieldName,
+                      type: fieldType,
+                      value: '',
+                      isVec: isVecType(fieldType),
+                      isTuple: isTupleType(fieldType),
+                      isOption: isOptionType(fieldType),
+                      isStruct: false, // 会在后续步骤中解析
+                      isEnum: false,
+                      itemType: isVecType(fieldType) ? extractVecItemType(fieldType) : undefined,
+                      tupleItems: isTupleType(fieldType) ? parseTupleTypes(fieldType) : [],
+                      nestedFields: [],
+                      enumVariants: [],
+                      hasValue: false,
+                      items: isVecType(fieldType) ? [{ value: '' }] : [],
+                      referencedStructName: undefined,
+                      referencedEnumName: undefined
+                    });
+                  }
+                } else {
+                  console.log(`未找到 Args 基类的 super 调用，尝试其他格式`);
+                  // 尝试更加灵活的正则表达式匹配
+                  const patterns = [
+                    // 匹配包含 value 参数的完整格式
+                    /super\s*\(\s*registry\s*,\s*\{([^}]*)\}\s*,\s*value\s*\)/s,
+                    // 匹配没有 value 参数的格式
+                    /super\s*\(\s*registry\s*,\s*\{([^}]*)\}\s*\)/s,
+                    // 更宽松的匹配，处理可能的空白字符
+                    /super\s*\(\s*registry\s*,\s*\{([\s\S]*?)\}\s*(?:,\s*value\s*)?\)/,
+                    // 最宽松的匹配
+                    /super\s*\([^{]*\{([\s\S]*?)\}/
+                  ];
+                  
+                  let matchFound = false;
+                  for (let i = 0; i < patterns.length; i++) {
+                    const pattern = patterns[i];
+                    const match = argsClassContent.match(pattern);
+                    if (match) {
+                      const structDefinition = match[1];
+                      console.log(`找到 Args 基类结构 (模式${i+1}): ${structDefinition.replace(/\s+/g, ' ')}`);
+                      
+                      // 解析结构字段
+                      const fieldRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*([^,\n}]+)/g;
+                      let fieldMatch;
+                      
+                      while ((fieldMatch = fieldRegex.exec(structDefinition)) !== null) {
+                        const fieldName = fieldMatch[1].trim();
+                        let fieldType = fieldMatch[2].trim();
+                        
+                        // 记录原始类型用于显示
+                        const originalType = fieldType;
+                        
+                        // 替换参数：T -> 实际传入的参数值，S -> 实际传入的参数值
+                        if (fieldType === 'T') {
+                          fieldType = param1;
+                        } else if (fieldType === 'S') {
+                          fieldType = param2;
+                        }
+                        
+                        console.log(`解析 Args 字段 (模式${i+1}): ${fieldName} : ${originalType} -> ${fieldType}`);
+                        
+                        argsFields.push({
+                          name: fieldName,
+                          type: fieldType,
+                          value: '',
+                          isVec: isVecType(fieldType),
+                          isTuple: isTupleType(fieldType),
+                          isOption: isOptionType(fieldType),
+                          isStruct: false,
+                          isEnum: false,
+                          itemType: isVecType(fieldType) ? extractVecItemType(fieldType) : undefined,
+                          tupleItems: isTupleType(fieldType) ? parseTupleTypes(fieldType) : [],
+                          nestedFields: [],
+                          enumVariants: [],
+                          hasValue: false,
+                          items: isVecType(fieldType) ? [{ value: '' }] : [],
+                          referencedStructName: undefined,
+                          referencedEnumName: undefined
+                        });
+                      }
+                      matchFound = true;
+                      break;
+                    }
+                  }
+                  
+                  if (!matchFound) {
+                    console.log(`所有格式都未匹配成功，Args 类内容:`, argsClassContent.substring(0, 200));
+                    // 尝试手动解析 - 如果能看到结构但正则失败
+                    if (argsClassContent.includes('signature:') && argsClassContent.includes('payload:')) {
+                      console.log(`检测到标准 Args 结构，手动解析`);
+                      // 手动创建标准 Args 字段
+                      argsFields = [
+                        {
+                          name: 'signature',
+                          type: param2, // S 参数
+                          value: '',
+                          isVec: isVecType(param2),
+                          isTuple: isTupleType(param2),
+                          isOption: isOptionType(param2),
+                          isStruct: false,
+                          isEnum: false,
+                          itemType: isVecType(param2) ? extractVecItemType(param2) : undefined,
+                          tupleItems: isTupleType(param2) ? parseTupleTypes(param2) : [],
+                          nestedFields: [],
+                          enumVariants: [],
+                          hasValue: false,
+                          items: isVecType(param2) ? [{ value: '' }] : [],
+                          referencedStructName: undefined,
+                          referencedEnumName: undefined
+                        },
+                        {
+                          name: 'signer',
+                          type: 'AccountId',
+                          value: '',
+                          isVec: false,
+                          isTuple: false,
+                          isOption: false,
+                          isStruct: false,
+                          isEnum: false,
+                          nestedFields: [],
+                          enumVariants: [],
+                          hasValue: false,
+                          items: [],
+                          referencedStructName: undefined,
+                          referencedEnumName: undefined
+                        },
+                        {
+                          name: 'nonce',
+                          type: 'U64',
+                          value: '',
+                          isVec: false,
+                          isTuple: false,
+                          isOption: false,
+                          isStruct: false,
+                          isEnum: false,
+                          nestedFields: [],
+                          enumVariants: [],
+                          hasValue: false,
+                          items: [],
+                          referencedStructName: undefined,
+                          referencedEnumName: undefined
+                        },
+                        {
+                          name: 'payload',
+                          type: param1, // T 参数
+                          value: '',
+                          isVec: isVecType(param1),
+                          isTuple: isTupleType(param1),
+                          isOption: isOptionType(param1),
+                          isStruct: false,
+                          isEnum: false,
+                          itemType: isVecType(param1) ? extractVecItemType(param1) : undefined,
+                          tupleItems: isTupleType(param1) ? parseTupleTypes(param1) : [],
+                          nestedFields: [],
+                          enumVariants: [],
+                          hasValue: false,
+                          items: isVecType(param1) ? [{ value: '' }] : [],
+                          referencedStructName: undefined,
+                          referencedEnumName: undefined
+                        }
+                      ];
+                      console.log(`手动解析完成，创建了 ${argsFields.length} 个字段`);
+                    } else {
+                      // 提供一个通用的结构提示
+                      argsFields = [{
+                        name: 'unknown_structure',
+                        type: 'any',
+                        value: '',
+                        isVec: false,
+                        isTuple: false,
+                        isOption: false,
+                        isStruct: false,
+                        isEnum: false,
+                        nestedFields: [],
+                        enumVariants: [],
+                        hasValue: false,
+                        items: [],
+                        referencedStructName: undefined,
+                        referencedEnumName: undefined
+                      }];
+                    }
+                  }
+                }
+              } else {
+                console.log(`代码中未找到 Args 基类定义`);
+                // 如果代码中没有 Args 的定义，创建一个提示字段
+                argsFields = [{
+                  name: 'args_not_found',
+                  type: 'any',
+                  value: '',
+                  isVec: false,
+                  isTuple: false,
+                  isOption: false,
+                  isStruct: false,
+                  isEnum: false,
+                  nestedFields: [],
+                  enumVariants: [],
+                  hasValue: false,
+                  items: [],
+                  referencedStructName: undefined,
+                  referencedEnumName: undefined
+                }];
+              }
+
+              extractedClasses.push({
+                name: className,
+                type: 'Struct',
+                definition: `class ${className} extends Args`,
+                fields: argsFields,
+                debugMode: false,
+                debugResult: '',
+                baseType: 'Args',
+                valueType: `Args<T: ${param1}, S: ${param2}${param3 ? `, value: ${param3}` : ''}>`,
+                // 添加构造函数参数信息
+                constructorParams: {
+                  original: constructorParams,
+                  T: param1,
+                  S: param2,
+                  value: param3,
+                  argsFieldsCount: argsFields.length,
+                  parseStatus: argsFields.length > 0 && argsFields[0].name !== 'unknown_structure' && argsFields[0].name !== 'args_not_found' ? 'success' : 'failed'
+                }
+              });
+
+              console.log(`创建 Args 结构体: ${className}, 字段数: ${argsFields.length}`);
+            } else {
+              console.log(`未找到 ${className} 的 super 调用`);
+            }
+          } else {
+            console.log(`未找到 ${className} 的构造函数`);
           }
           continue;
         }
@@ -1031,6 +1456,13 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
           } else if (constValue.includes('U8aFixed.with')) {
             extractedType = 'U8aFixed';
             baseType = 'U8aFixed';
+            // 提取位长度信息
+            const bitLengthMatch = constValue.match(/U8aFixed\.with\s*\(\s*(\d+)(?:\s+as\s+U8aBitLength)?\s*\)/);
+            if (bitLengthMatch) {
+              const bitLength = bitLengthMatch[1];
+              baseType = `U8aFixed<${bitLength}>`;
+              console.log(`解析 U8aFixed 类型: ${constName}, 位长度: ${bitLength}`);
+            }
           } else if (constValue.includes('Struct.with')) {
             extractedType = 'Struct';
             baseType = 'Struct';
@@ -1103,13 +1535,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       extractedClasses.map(c => `${c.name}(${c.type})`).join(', '));
 
     return extractedClasses;
-  }, [parseStructFields, parseEnumMembers, parseObjectFieldsToDebugFields, parseObjectFieldsToVariants]);
-
-  const handleFunctionSelect = useCallback((func: ParsedFunction) => {
-    setSelectedFunction(func);
-    setFunctionInputs({});
-    setResult("");
-  }, []);
+  }, [parseStructFields, parseEnumMembers, parseObjectFieldsToDebugFields, parseEnumVariantsFromClassDef]);
 
   const executeDebug = useCallback(async (classIndex: number) => {
     const codecClass = extractedClasses[classIndex];
@@ -1220,6 +1646,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       console.log("functionArgs", functionArgs)
 
       if (FunctionType && typeof FunctionType === 'function') {
+        console.log("FunctionType", FunctionType, "functionArgs", functionArgs, Object.values(functionArgs))
         const functionResult = await FunctionType(...Object.values(functionArgs));
         result = `Function call result:\n${JSON.stringify(functionResult, null, 2)}`;
       } else {
@@ -1334,76 +1761,202 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     });
   }, [isCustomType]);
 
+
+
+  const inferTypeFromFunctionBody = useCallback((functionBody: string, paramName: string, functionName: string): string | null => {
+    console.log(`    🔍 开始推断参数 ${paramName} 的类型，函数: ${functionName}`);
+    console.log(`    函数体内容片段: ${functionBody.substring(0, 200)}...`);
+    
+    // pattern1: new SomeType(registry, TypeArg, paramName) - 3-param constructor
+    const constructorPattern = new RegExp(`new\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*registry\\s*,\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*,\\s*${paramName}\\s*\\)`, 'g');
+    let match = constructorPattern.exec(functionBody);
+    console.log(`    🔍 模式1检查 (三参数构造): 匹配=${!!match}`);
+    if (match) {
+      const constructorType = match[1]; // SignedArgs
+      const typeArg = match[2]; // SetModeArg
+      
+      // 对于三参数构造函数模式，返回构造函数类型（最外层类型）
+      // 例如：new SignedArgs(registry, SetModeArg, argsArg) -> argsArg 类型应该是 SignedArgs
+      console.log(`    ✓ 三参数构造函数模式: new ${constructorType}(registry, ${typeArg}, ${paramName})`);
+      console.log(`    推断 ${paramName} 类型为最外层类型: ${constructorType} (内部类型: ${typeArg})`);
+      
+      // 将内部类型信息存储，使用更具体的缓存键避免冲突
+      (window as any).__typeInferenceCache = (window as any).__typeInferenceCache || {};
+      const cacheKey = `${functionName}_${paramName}_${constructorType}_innerType`;
+      (window as any).__typeInferenceCache[cacheKey] = typeArg;
+      console.log(`    缓存类型信息: ${cacheKey} = ${typeArg}`);
+      
+      return constructorType; // 返回 SignedArgs 而不是 SetModeArg
+    }
+
+    // pattern2: new TypeName(registry, paramName) - 2-param constructor
+    const twoParamConstructorPattern = new RegExp(`new\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*registry\\s*,\\s*${paramName}\\s*\\)`, 'g');
+    match = twoParamConstructorPattern.exec(functionBody);
+    console.log(`    🔍 模式2检查 (双参数构造): 匹配=${!!match}`);
+    if (match) {
+      const constructorType = match[1];
+      console.log(`    ✓ 双参数构造函数模式: new ${constructorType}(registry, ${paramName})`);
+      return constructorType;
+    }
+
+    // pattern3: new SomeType(registry, typeArg, paramName) - case insensitive
+    const constructorPattern2 = new RegExp(`new\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*[^,]+\\s*,\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*,\\s*${paramName}\\s*\\)`, 'gi');
+    match = constructorPattern2.exec(functionBody);
+    console.log(`    🔍 模式3检查 (通用三参数): 匹配=${!!match}`);
+    if (match) {
+      const constructorType = match[1];
+      const typeArg = match[2];
+      console.log(`    ✓ 通用三参数构造函数模式: new ${constructorType}(..., ${typeArg}, ${paramName})`);
+      return typeArg;
+    }
+
+    // pattern4: paramName as SomeType
+    const asPattern = new RegExp(`${paramName}\\s+as\\s+([A-Za-z_$][A-Za-z0-9_$<>\\[\\]]+)`, 'g');
+    match = asPattern.exec(functionBody);
+    console.log(`    🔍 模式4检查 (as 类型转换): 匹配=${!!match}`);
+    if (match) {
+      console.log(`    ✓ as 类型转换模式: ${paramName} as ${match[1]}`);
+      return match[1];
+    }
+
+    // pattern5: (paramName: SomeType)
+    const typeAnnotationPattern = new RegExp(`\\(\\s*${paramName}\\s*:\\s*([A-Za-z_$][A-Za-z0-9_$<>\\[\\]]+)\\s*\\)`, 'g');
+    match = typeAnnotationPattern.exec(functionBody);
+    console.log(`    🔍 模式5检查 (类型注解): 匹配=${!!match}`);
+    if (match) {
+      console.log(`    ✓ 类型注解模式: (${paramName}: ${match[1]})`);
+      return match[1];
+    }
+
+    // pattern6: SomeType.from(paramName) or SomeType.create(paramName)
+    const factoryPattern = new RegExp(`([A-Za-z_$][A-Za-z0-9_$]*)\\.(?:from|create|with)\\s*\\(\\s*[^,]*${paramName}`, 'g');
+    match = factoryPattern.exec(functionBody);
+    console.log(`    🔍 模式6检查 (工厂方法): 匹配=${!!match}`);
+    if (match) {
+      console.log(`    ✓ 工厂方法模式: ${match[1]}.from/create/with(...${paramName}...)`);
+      return match[1];
+    }
+
+    // pattern7: more loose constructor pattern, support multi-param - const something = new Type(registry, SomeArg, paramName, ...)
+    const looseConstructorPattern = new RegExp(`new\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\([^)]*${paramName}[^)]*\\)`, 'g');
+    match = looseConstructorPattern.exec(functionBody);
+    console.log(`    🔍 模式7检查 (宽松构造): 匹配=${!!match}`);
+    if (match) {
+      const fullMatch = match[0];
+      const typeArgPattern = /new\s+[A-Za-z_$][A-Za-z0-9_$]*\s*\(\s*[^,]+\s*,\s*([A-Za-z_$][A-Za-z0-9_$]*)/;
+      const typeArgMatch = typeArgPattern.exec(fullMatch);
+      if (typeArgMatch) {
+        console.log(`    ✓ 宽松构造函数模式: ${fullMatch} -> ${typeArgMatch[1]}`);
+        return typeArgMatch[1];
+      }
+    }
+    
+    console.log(`    ❌ 所有模式都未匹配，无法推断类型`);
+    return null;
+  }, []);
+
+  const parseFunctionBodyTypes = useCallback((functionBody: string, parameters: Parameter[], functionName: string): Parameter[] => {
+    if (!functionBody) return parameters;
+
+    console.log(`🔍 解析函数 ${functionName} 的参数类型，函数体长度: ${functionBody.length}`);
+    console.log(`  原始参数: [${parameters.map(p => `${p.name}:${p.type}`).join(', ')}]`);
+
+    const updatedParameters = parameters.map(param => {
+      if (param.type !== 'any' && param.type !== 'unknown' && !param.type.includes('any')) {
+        console.log(`    ⏭️ 跳过 ${param.name}，已有明确类型: ${param.type}`);
+        return param;
+      }
+
+      console.log(`    🔍 推断参数 ${param.name} 的类型...`);
+      const inferredType = inferTypeFromFunctionBody(functionBody, param.name, functionName);
+      if (inferredType) {
+        console.log(`    ✅ 成功推断 ${param.name} 类型: ${param.type} -> ${inferredType}`);
+        return {
+          ...param,
+          type: inferredType,
+          customTypeName: isCustomType(inferredType) ? inferredType : undefined
+        };
+      } else {
+        console.log(`    ❌ 未能推断 ${param.name} 的类型，保持原类型: ${param.type}`);
+      }
+
+      return param;
+    });
+
+    console.log(`  ✅ 函数 ${functionName} 类型推断完成: [${updatedParameters.map(p => `${p.name}:${p.type}`).join(', ')}]`);
+    return updatedParameters;
+  }, [inferTypeFromFunctionBody, isCustomType]);
+
   const extractAndDefineFunctions = useCallback((code: string) => {
     if (!code || typeof code !== 'string') return;
+    
+    console.log(`📚 开始解析函数，代码长度: ${code.length}`);
+    console.log(`📚 代码内容预览: ${code.substring(0, 500)}...`);
+    
     const parsedFunctions: ParsedFunction[] = [];
 
-    // Enhanced function parsing regex, supports more formats
     const functionPatterns = [
-      // Standard function definition: function name(params): returnType
-      /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*:\s*([^{;]+)/gi,
-      // Arrow function: const name = (params): returnType => 
-      /(?:export\s+)?const\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*:\s*([^=]+)\s*=>/gi,
-      // Method definition: name(params): returnType
-      /([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*:\s*([^{;,}]+)(?:\s*[{;,])/gi
+      // standard function definition: function name(params): returnType { body }
+      /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*:\s*([^{]+)\s*\{([^]*?)\}/gi,
+      // arrow function: const name = (params): returnType => { body }
+      /(?:export\s+)?const\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*:\s*([^=]+)\s*=>\s*\{([^]*?)\}/gi,
     ];
 
     let totalMatches = 0;
 
     functionPatterns.forEach((pattern, patternIndex) => {
       let match;
-      let patternMatches = 0;
+      console.log(`🔍 使用模式 ${patternIndex + 1} 搜索函数...`);
 
-      // Reset regex lastIndex
+      // reset regex lastIndex
       pattern.lastIndex = 0;
 
       while ((match = pattern.exec(code)) !== null) {
         const name = match[1];
         const params = match[2] || '';
         const returnType = match[3];
+        const functionBody = match[4] || '';
         
-        // Check if function with same name already exists
+        console.log(`🎯 找到函数: ${name}(${params}): ${returnType.trim()}`);
+        console.log(`  函数体预览: ${functionBody.substring(0, 100)}...`);
+        
         const existingFunction = parsedFunctions.find(f => f.name === name);
         if (existingFunction) {
-          console.log(`Skipping duplicate function: ${name}`);
+          console.log(`  ⚠️ 跳过重复函数: ${name}`);
           continue;
         }
         
-        patternMatches++;
         totalMatches++;
 
         const parameters = parseParameters(params);
+        console.log(`  📝 解析到参数: [${parameters.map(p => `${p.name}:${p.type}`).join(', ')}]`);
+        
+        const enhancedParameters = parseFunctionBodyTypes(functionBody, parameters, name);
 
         parsedFunctions.push({
           name,
-          parameters,
+          parameters: enhancedParameters,
           returnType: returnType.trim(),
         });
-      }
-
-      if (patternMatches > 0) {
-        console.log(`Pattern ${patternIndex + 1} matched ${patternMatches} functions`);
+        
+        console.log(`  ✅ 函数 ${name} 解析完成，最终参数: [${enhancedParameters.map(p => `${p.name}:${p.type}`).join(', ')}]`);
       }
     });
 
-    console.log(`Function parsing completed, found ${parsedFunctions.length} unique functions:`,
+    console.log(`📚 函数解析完成，找到 ${parsedFunctions.length} 个函数:`,
       parsedFunctions.map(f => `${f.name}(${f.parameters.length} parameters)`).join(', '));
 
     setFunctions(parsedFunctions);
-  }, [parseParameters]);
+  }, [parseParameters, parseFunctionBodyTypes]);
 
   const parseTsCode = useCallback(async () => {
     const codeToparse = currentCode || tsCode;
     if (!codeToparse) return;
 
-    console.log('Starting code parsing, using:', currentCode ? 'current code' : 'original code');
-
     if (type === 'type') {
       const extractedPolkadotTypes = extractAndDefineClasses(codeToparse);
       setExtractedClasses(extractedPolkadotTypes);
-    } else if (type === 'function') {
-      extractAndDefineFunctions(codeToparse);
-    } else {
+    }else {
       const extractedPolkadotTypes = extractAndDefineClasses(codeToparse);
       setExtractedClasses(extractedPolkadotTypes);
       extractAndDefineFunctions(codeToparse);
@@ -1474,6 +2027,69 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       }
     }
   }, [extractedClasses, isCustomType]);
+
+  useEffect(() => {
+    if (extractedClasses.length > 0) {
+      setFunctions(prevFunctions => {
+        if (prevFunctions.length === 0) {
+          console.log('no functions to update');
+          return prevFunctions;
+        }
+
+        const updatedFunctions = prevFunctions.map(func => {
+          if (func.debugInputs) {
+            const updatedDebugInputs = func.debugInputs.map(input => {
+              const referencedStruct = extractedClasses.find(c => c.name === input.type && c.type === 'Struct');
+              const referencedEnum = extractedClasses.find(c => c.name === input.type && c.type === 'Enum');
+              
+              if (referencedStruct && !input.isStruct) {
+                return {
+                  ...input,
+                  isStruct: true,
+                  referencedStructName: input.type,
+                  nestedFields: referencedStruct.fields ? JSON.parse(JSON.stringify(referencedStruct.fields)) : []
+                };
+              } else if (referencedEnum && !input.isEnum) {
+                return {
+                  ...input,
+                  isEnum: true,
+                  referencedEnumName: input.type,
+                  enumVariants: referencedEnum.variants ? JSON.parse(JSON.stringify(referencedEnum.variants)) : []
+                };
+              }
+              return input;
+            });
+
+            const hasChanges = updatedDebugInputs.some((input, index) =>
+              input.isStruct !== func.debugInputs![index]?.isStruct ||
+              input.isEnum !== func.debugInputs![index]?.isEnum ||
+              (input.nestedFields?.length || 0) !== (func.debugInputs![index]?.nestedFields?.length || 0) ||
+              (input.enumVariants?.length || 0) !== (func.debugInputs![index]?.enumVariants?.length || 0)
+            );
+
+            if (hasChanges) {
+              return {
+                ...func,
+                debugInputs: updatedDebugInputs
+              };
+            }
+          }
+          return func;
+        });
+
+        const hasAnyChanges = updatedFunctions.some((func, index) => {
+          const originalFunc = prevFunctions[index];
+          return func !== originalFunc;
+        });
+        
+        if (hasAnyChanges) {
+          return updatedFunctions;
+        } else {
+          return prevFunctions;
+        }
+      });
+    }
+  }, [extractedClasses]);
 
   const renderFieldInput = useCallback((
     field: DebugField,
@@ -1659,7 +2275,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                                 classIndex,
                                 `variants.${selectedVariant.name}.${nestedField.name}`,
                                 1,
-                                context
+                                'type'
                               )
                             )}
                           </div>
@@ -1729,6 +2345,57 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {codecClass.type === 'Struct' && codecClass.fields && codecClass.fields.length > 0 && (
           <div className="space-y-3">
             <h6 className="text-sm font-medium text-blue-700">Struct Fields:</h6>
+            {/* 显示 Args 类型的额外信息 */}
+            {codecClass.baseType === 'Args' && codecClass.valueType && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
+                <div className="text-sm font-medium text-yellow-800 mb-2">Args 类型信息:</div>
+                <div className="text-xs text-yellow-700">
+                  <div>基础类型: <span className="font-mono">{codecClass.baseType}</span></div>
+                  <div>类型参数: <span className="font-mono">{codecClass.valueType}</span></div>
+                  
+                  {/* 显示构造函数参数详情 */}
+                  {codecClass.constructorParams && (
+                    <div className="mt-3">
+                      <div className="font-medium">构造函数参数解析:</div>
+                      <div className="ml-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span>解析状态:</span>
+                          <Chip 
+                            size="sm" 
+                            variant="flat" 
+                            color={codecClass.constructorParams.parseStatus === 'success' ? 'success' : 'danger'}
+                          >
+                            {codecClass.constructorParams.parseStatus === 'success' ? '成功' : '失败'}
+                          </Chip>
+                        </div>
+                        <div>原始参数: <span className="font-mono text-xs bg-gray-100 px-1 rounded">{codecClass.constructorParams.original}</span></div>
+                        <div>T 参数: <span className="font-mono text-blue-600">{codecClass.constructorParams.T}</span></div>
+                        <div>S 参数: <span className="font-mono text-green-600">{codecClass.constructorParams.S}</span></div>
+                        {codecClass.constructorParams.value && (
+                          <div>value 参数: <span className="font-mono text-purple-600">{codecClass.constructorParams.value}</span></div>
+                        )}
+                        <div>解析字段数: <span className="font-mono">{codecClass.constructorParams.argsFieldsCount}</span></div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="mt-2">
+                    <div className="font-medium">Args 结构说明:</div>
+                    <div className="ml-2 space-y-1">
+                      <div>• 这是一个继承自 Args 的类型，具有动态解析的字段结构</div>
+                      <div>• 字段类型根据传入的类型参数自动确定</div>
+                      <div>• 字段数量: {codecClass.fields?.length || 0} 个</div>
+                      {codecClass.fields?.length === 1 && codecClass.fields[0].name === 'unknown_structure' && (
+                        <div className="text-orange-600">• ⚠️ 未找到完整的 Args 基类定义，请确保代码中包含 Args 类</div>
+                      )}
+                      {codecClass.fields?.length === 1 && codecClass.fields[0].name === 'args_not_found' && (
+                        <div className="text-red-600">• ❌ 未在代码中找到 Args 基类定义</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {codecClass.fields.map((field, fieldIndex) =>
               renderFieldInput(field, classIndex, field.name, 0)
             )}
@@ -1778,7 +2445,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                                 nestedField,
                                 classIndex,
                                 `variants.${selectedVariant.name}.${nestedField.name}`,
-                                1
+                                1,
+                                'type'
                               )
                             )}
                           </div>
@@ -1923,11 +2591,16 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
             <h6 className="text-sm font-medium text-blue-700">{codecClass.type} Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Base Type: <span className="font-mono">{codecClass.baseType}</span>
+              {codecClass.type === 'U8aFixed' && codecClass.baseType?.includes('<') && (
+                <div className="mt-1">
+                  固定长度字节数组，需要输入十六进制值 (例如: 0x1234...)
+                </div>
+              )}
             </div>
             <Input
               size="sm"
               label={`${codecClass.type} Value`}
-              placeholder={getPlaceholder(codecClass.baseType || codecClass.type)}
+              placeholder={codecClass.type === 'U8aFixed' ? '0x...' : getPlaceholder(codecClass.baseType || codecClass.type)}
               value={codecClass.debugValue || ''}
               onChange={(e) => updateDebugValue(classIndex, 'debugValue', e.target.value)}
             />
@@ -2136,6 +2809,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
   const renderFunctionDebugInterface = useCallback((func: ParsedFunction, functionIndex: number) => {
     if (!func.debugMode) return null;
 
+    console.log(`渲染函数 ${func.name} 的调试界面，调试输入数量: ${func.debugInputs?.length || 0}`);
+
     return (
       <div className="mt-4 p-4 bg-green-50 rounded-lg space-y-4">
         <div className="flex items-center justify-between">
@@ -2152,9 +2827,9 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Function parameters input */}
         {func.debugInputs && func.debugInputs.length > 0 && (
           <div className="space-y-3">
-            {func.debugInputs.map((field, fieldIndex) =>
-              renderFieldInput(field, functionIndex, field.name, 0, 'function')
-            )}
+            {func.debugInputs.map((field, fieldIndex) => {
+              return renderFieldInput(field, functionIndex, field.name, 0, 'function');
+            })}
           </div>
         )}
 
@@ -2202,6 +2877,12 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                 </Chip>
               </div>
               <div className="flex items-center gap-2">
+                <span className="text-default-600">Args Types:</span>
+                <Chip size="sm" variant="flat" color={extractedClasses.filter(c => c.baseType === 'Args').length > 0 ? "warning" : "default"}>
+                  {extractedClasses.filter(c => c.baseType === 'Args').length}
+                </Chip>
+              </div>
+              <div className="flex items-center gap-2">
                 <span className="text-default-600">Nested Fields:</span>
                 <Chip size="sm" variant="flat" color={extractedClasses.some(c => c.variants?.some(v => v.nestedFields && v.nestedFields.length > 0)) ? "success" : "default"}>
                   {extractedClasses.reduce((total, c) => total + (c.variants?.reduce((vTotal, v) => vTotal + (v.nestedFields?.length || 0), 0) || 0), 0)}
@@ -2217,7 +2898,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         </CardBody>
       </Card>
 
-      {extractedClasses.length > 0 && (
+      {extractedClasses.length > 0 && type === 'type' && (
         <Card>
           <CardHeader>
             <h4 className="text-md font-semibold">Polkadot Codec Types</h4>
@@ -2234,7 +2915,34 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                         <Chip size="sm" variant="flat" color="secondary">
                           {codecClass.type}
                         </Chip>
+                        {/* 为 Args 类型显示额外的基础类型信息 */}
+                        {codecClass.baseType === 'Args' && (
+                          <Chip size="sm" variant="flat" color="warning">
+                            Args
+                          </Chip>
+                        )}
                         <span className="font-mono">{codecClass.name}</span>
+                        {/* 显示 Args 类型的参数信息 */}
+                        {codecClass.baseType === 'Args' && codecClass.valueType && (
+                          <span className="text-xs text-default-500 ml-2">
+                            ({codecClass.valueType})
+                          </span>
+                        )}
+                        {/* 显示构造函数参数状态 */}
+                        {codecClass.constructorParams && (
+                          <div className="flex items-center gap-1 ml-2">
+                            <Chip 
+                              size="sm" 
+                              variant="dot" 
+                              color={codecClass.constructorParams.parseStatus === 'success' ? 'success' : 'warning'}
+                            >
+                              {codecClass.constructorParams.parseStatus === 'success' ? 
+                                `${codecClass.constructorParams.argsFieldsCount} 字段` : 
+                                '解析中'
+                              }
+                            </Chip>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs text-default-500">Debug</span>
@@ -2332,10 +3040,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
               {functions.map((func, index) => (
                 <Card
                   key={index}
-                  isPressable
                   isHoverable
-                  className={`cursor-pointer ${selectedFunction?.name === func.name ? 'ring-2 ring-primary' : ''}`}
-                  onPress={() => handleFunctionSelect(func)}
+                  className="cursor-pointer"
                 >
                   <CardBody>
                     <div className="space-y-2">
@@ -2357,12 +3063,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                       <div className="text-sm text-default-500">
                         Parameters: {func.parameters.length}
                       </div>
-                      <div className="text-sm">
-                        Return type: <span className="font-mono">{func.returnType}</span>
-                      </div>
                       {func.parameters.length > 0 && (
                         <div className="space-y-1">
-                          <div className="text-xs text-default-500">Parameter list:</div>
                           {func.parameters.map((param, paramIndex) => (
                             <div key={paramIndex} className="flex items-center gap-2 text-xs ml-4">
                               <span className="font-mono text-primary">{param.name}</span>
@@ -2370,6 +3072,9 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                               <span className="font-mono text-secondary">{param.type}</span>
                               {param.optional && (
                                 <Chip size="sm" variant="flat" color="warning">Optional</Chip>
+                              )}
+                              {param.customTypeName && (
+                                <Chip size="sm" variant="flat" color="success">Custom: {param.customTypeName}</Chip>
                               )}
                             </div>
                           ))}

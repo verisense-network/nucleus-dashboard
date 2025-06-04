@@ -443,9 +443,6 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
         `;
 
         const func = new Function(`
-            const codecTypes = arguments[0];
-            const window = arguments[1];
-            
             ${functionWrapper}
             
             return ${name};
@@ -465,6 +462,64 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     console.log(`Function definitions completed, successfully registered ${functionDefinitions.length} functions`);
   }, []);
 
+  const extractAndDefineHelperFunctions = useCallback((jsCode: string) => {
+    const helperFunctions: { name: string; code: string }[] = [];
+    
+    const functionStartPattern = /function\s+(_[A-Za-z_$][A-Za-z0-9_$]*)\s*\([^)]*\)\s*\{/g;
+    let match;
+    
+    while ((match = functionStartPattern.exec(jsCode)) !== null) {
+      const functionName = match[1];
+      const startIndex = match.index;
+      const openBraceIndex = match.index + match[0].length - 1; // 函数体开始的 { 位置
+      
+      let braceCount = 1;
+      let currentIndex = openBraceIndex + 1;
+      
+      while (currentIndex < jsCode.length && braceCount > 0) {
+        const char = jsCode[currentIndex];
+        if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+        }
+        currentIndex++;
+      }
+      
+      if (braceCount === 0) {
+        const endIndex = currentIndex;
+        const functionCode = jsCode.substring(startIndex, endIndex);
+        
+        helperFunctions.push({
+          name: functionName,
+          code: functionCode
+        });
+      } else {
+        console.log(`function ${functionName} braceCount: ${braceCount}`);
+      }
+    }
+    
+    helperFunctions.forEach(({ name, code }) => {
+      try {
+        const func = new Function(`
+          ${code}
+          return ${name};
+        `);
+        
+        const functionInstance = func();
+        if (functionInstance) {
+          (window as any)[name] = functionInstance;
+          console.log(`Successfully registered helper function ${name} to window`);
+        }
+      } catch (error) {
+        console.error(`Error registering helper function ${name}:`, error);
+        console.error(`helper function code:`, code);
+      }
+    });
+    
+    console.log(`helper functions registered, total ${helperFunctions.length} functions`);
+  }, []);
+
   const defineCodecTypesToWindow = useCallback((tsCode: string) => {
     (window as any).codecTypes = codecTypes;
     const registry = new TypeRegistry() as unknown as Registry;
@@ -475,7 +530,9 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     (window as any).ApiPromise = ApiPromise;
     (window as any).Buffer = Buffer;
 
-    let jsCode = transform(tsCode, { transforms: ['typescript'] }).code;
+    const jsCode = transform(tsCode, { transforms: ['typescript'] }).code;
+
+    extractAndDefineHelperFunctions(jsCode);
 
     extractAndDefineCodecImports(jsCode);
 
@@ -490,8 +547,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     });
 
     (window as any).api = api;
-
-  }, [extractAndDefineCodecImports, extractClasses, extractAndDefineConstantTypes, extractAndDefineFunctions]);
+  }, [extractAndDefineCodecImports, extractClasses, extractAndDefineConstantTypes, extractAndDefineFunctions, extractAndDefineHelperFunctions]);
 
   useEffect(() => {
     loadAbiData();
@@ -569,7 +625,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
               </pre>
             </div>
           </Tab>
-          <Tab key="raw" title="Raw ABI">
+          <Tab key="raw" title="Raw">
             <div className="py-4">
               <pre className="bg-default-100 p-4 rounded-lg overflow-auto text-xs">
                 {JSON.stringify(abiData, null, 2)}
