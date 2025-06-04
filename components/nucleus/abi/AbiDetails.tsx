@@ -471,7 +471,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     while ((match = functionStartPattern.exec(jsCode)) !== null) {
       const functionName = match[1];
       const startIndex = match.index;
-      const openBraceIndex = match.index + match[0].length - 1; // 函数体开始的 { 位置
+      const openBraceIndex = match.index + match[0].length - 1;
       
       let braceCount = 1;
       let currentIndex = openBraceIndex + 1;
