@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { WalletStatus } from "@/components/connectWallet";
 
 export default function Header() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function Header() {
         <div className="max-w-xl w-full mx-4">
         </div>
         <div className="flex-shrink-0 flex space-x-1 md:space-x-5 items-center">
-          
+          <WalletStatus />
         </div>
       </div>
     </header>
