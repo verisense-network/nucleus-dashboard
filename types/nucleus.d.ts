@@ -12,8 +12,4 @@ export interface NucleusInfo {
   a2aCompatiable: boolean;
 }
 
-export interface NucleusListResponse {
-  success: boolean;
-  data?: NucleusInfo[];
-  message?: string;
-} 
+export type NucleusListResponse = APIResponse<NucleusInfo[]>;

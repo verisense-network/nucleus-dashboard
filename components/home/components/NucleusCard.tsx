@@ -1,9 +1,6 @@
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Divider } from "@heroui/divider";
-import { User } from "@heroui/user";
+import { Card, CardBody } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import { NucleusInfo } from "@/types/nucleus";
-import { AddressViewFormat } from "@/utils/format";
 import Link from "next/link";
 
 interface NucleusCardProps {
@@ -29,7 +26,7 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
               </Chip>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-default-500">
             <span className="text-sm">ID: {nucleus.id}</span>
           </div>
         </div>
@@ -39,7 +36,7 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
 
   if (showLink) {
     return (
-      <Link href={`/${nucleus.id}`} className="block">
+      <Link href={`/nuclei/${nucleus.id}`} className="block">
         <CardContent />
       </Link>
     );

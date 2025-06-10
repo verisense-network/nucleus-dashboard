@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { createComputed } from "zustand-computed";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { web3Accounts, web3Enable } from "@polkadot/extension-dapp";
 
 export interface PolkadotAccount {
   address: string;
@@ -52,13 +51,15 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
         try {
           set({ isConnecting: true, error: null });
 
+          const { web3Enable, web3Accounts } = await import("@polkadot/extension-dapp");
+
           const extensions = await web3Enable("Nucleus Dashboard");
           
           if (extensions.length === 0) {
             throw new Error("not found Polkadot wallet extension, please install SubWallet");
           }
 
-          const subWallet = extensions.find(ext => 
+          const subWallet = extensions.find((ext: any) => 
             ext.name.toLowerCase().includes("subwallet") || 
             ext.name.toLowerCase().includes("polkadot")
           );
@@ -76,7 +77,7 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
             throw new Error("no available accounts in the wallet, please create or import accounts in the wallet");
           }
 
-          const formattedAccounts: PolkadotAccount[] = accounts.map(account => ({
+          const formattedAccounts: PolkadotAccount[] = accounts.map((account: any) => ({
             address: account.address,
             meta: account.meta,
             type: account.type,
@@ -117,6 +118,8 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
 
       checkConnection: async () => {
         try {
+          const { web3Enable, web3Accounts } = await import("@polkadot/extension-dapp");
+
           const extensions = await web3Enable("Nucleus Dashboard");
           if (extensions.length === 0) {
             set({ isConnected: false, accounts: [], selectedAccount: null });
@@ -129,7 +132,7 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
             return;
           }
 
-          const formattedAccounts: PolkadotAccount[] = accounts.map(account => ({
+          const formattedAccounts: PolkadotAccount[] = accounts.map((account: any) => ({
             address: account.address,
             meta: account.meta,
             type: account.type,
@@ -159,7 +162,13 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
     })),
     {
       name: "polkadot-wallet",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        return typeof window !== 'undefined' ? localStorage : {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {},
+        };
+      }),
       version: 1,
       partialize: (state) => ({
         selectedAccount: state.selectedAccount,

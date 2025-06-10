@@ -1,4 +1,5 @@
 import NucleusList from "@/components/home/NucleusList";
+import AgentList from "@/components/home/AgentList";
 import NodeDetail from "@/components/home/NodeDetail";
 import { MetaData } from "@/config/website";
 
@@ -17,6 +18,9 @@ export default async function Home() {
       </div>
       <div className="w-full">
         <NucleusList />
+      </div>
+      <div className="w-full">
+        <AgentList />
       </div>
     </div>
   );

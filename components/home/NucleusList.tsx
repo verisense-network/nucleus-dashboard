@@ -27,7 +27,7 @@ export default async function NucleusList() {
   return (
     <>
       <h2 className="text-lg mb-4">Nucleus</h2>
-      <div className="w-full mx-auto space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
         {nucleusList.length === 0 ? (
           <Card>
             <CardBody>

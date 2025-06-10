@@ -2,7 +2,6 @@ import { ENDPOINT } from "@/config/endpoint";
 import { getPolkadotApi } from "@/lib/polkadotApi";
 import { getRpcClient } from "@/lib/rpcClient";
 import { NucleusInfo } from "@/types/nucleus";
-import { WsProvider } from "@polkadot/rpc-provider";
 import { decodeAddress, encodeAddress } from "@polkadot/util-crypto";
 
 const VERISENSE_PREFIX = 137
