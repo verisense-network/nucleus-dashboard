@@ -12,7 +12,6 @@ export function WalletStatus() {
   if (!isConnected) {
     return (
       <Button
-        size="sm"
         variant="bordered"
         startContent={<Wallet className="w-4 h-4" />}
         onPress={connectWallet}
