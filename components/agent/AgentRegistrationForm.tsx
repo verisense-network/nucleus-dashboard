@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
-import { Button } from '@heroui/react';
-import { Card, CardBody, CardHeader } from '@heroui/react';
+import { Button, CardHeader } from '@heroui/react';
+import { Card, CardBody } from '@heroui/react';
 import { Input, Textarea, Select, SelectItem } from '@heroui/react';
 import { Checkbox, Switch } from '@heroui/react';
 import { Divider } from '@heroui/react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, FileText } from 'lucide-react';
 import { AgentCard, SecurityScheme } from '@/types/a2a';
 
 // Helper type for form data to handle securitySchemes as an array
@@ -33,17 +33,111 @@ interface AgentRegistrationFormProps {
   isLoading?: boolean;
 }
 
+const testData = {
+  "name": "Test",
+  "description": "this is a description",
+  "url": "https://x.com/veri_sense",
+  "iconUrl": "https://tailwindcss.com/_next/static/media/tailwindcss-mark.d52e9897.svg",
+  "version": "1.0.0",
+  "documentationUrl": "https://x.com/veri_sense",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": true,
+    "stateTransitionHistory": false,
+    "extensions": []
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "skill1",
+      "name": "sdasafasfd",
+      "description": "afsdasfdsfadfsdaasdfasfd",
+      "tags": [
+        "adfasdf"
+      ],
+      "examples": [
+        "ddddddd"
+      ],
+      "inputModes": [],
+      "outputModes": []
+    }
+  ],
+  "supportsAuthenticatedExtendedCard": true,
+  "provider": {
+    "organization": "Verisense",
+    "url": "https://x.com/veri_sense"
+  },
+  "securitySchemesArray": [
+    {
+      "schemeName": "test",
+      "scheme": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "afsafdsfdasafdsfadasfd"
+      }
+    },
+    {
+      "schemeName": "test1",
+      "scheme": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "1111",
+        "description": "111111"
+      }
+    }
+  ],
+  "securityArray": [
+    {
+      "schemeName": "test",
+      "scopes": [
+        "write"
+      ]
+    },
+    {
+      "schemeName": "test1",
+      "scopes": [
+        "admin"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "test": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"X-API-Key\",\"description\":\"afsafdsfdasafdsfadasfd\"}",
+    "test1": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"1111\",\"description\":\"111111\"}"
+  },
+  "security": [
+    {
+      "test": [
+        "write"
+      ]
+    },
+    {
+      "test1": [
+        "admin"
+      ]
+    }
+  ]
+}
+
 export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   onSubmit,
   initialData,
   isLoading = false,
 }) => {
+  const [jsonInput, setJsonInput] = useState('');
+  const [jsonError, setJsonError] = useState('');
+
   const {
     control,
-    register,
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
@@ -156,83 +250,242 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     reset();
   };
 
+  const parseJsonData = (input?: string) => {
+    try {
+      setJsonError('');
+      const parsedData = JSON.parse(input || jsonInput);
+
+      if (!parsedData || typeof parsedData !== 'object') {
+        throw new Error('Invalid JSON format');
+      }
+
+      const formData: Partial<FormData> = {
+        ...parsedData,
+        securitySchemesArray: parsedData.securitySchemes
+          ? Object.entries(parsedData.securitySchemes).map(([schemeName, scheme]) => ({
+            schemeName,
+            scheme: JSON.parse(scheme as string),
+          }))
+          : [],
+        securityArray: parsedData.security
+          ? parsedData.security.flatMap((requirement: any) =>
+            Object.entries(requirement).map(([schemeName, scopes]) => ({
+              schemeName,
+              scopes: Array.isArray(scopes) ? scopes : [],
+            }))
+          )
+          : [],
+      };
+
+      reset(formData);
+      setJsonInput('');
+    } catch (error) {
+      setJsonError(error instanceof Error ? error.message : 'Invalid JSON format');
+    }
+  };
+
+  const parseTestData = () => {
+    parseJsonData(JSON.stringify(testData));
+  }
+
+  const clearForm = () => {
+    reset({
+      name: '',
+      description: '',
+      url: '',
+      iconUrl: '',
+      version: '1.0.0',
+      documentationUrl: '',
+      capabilities: {
+        streaming: false,
+        pushNotifications: false,
+        stateTransitionHistory: false,
+        extensions: [],
+      },
+      defaultInputModes: ['text/plain'],
+      defaultOutputModes: ['text/plain'],
+      skills: [],
+      supportsAuthenticatedExtendedCard: false,
+      provider: {
+        organization: '',
+        url: '',
+      },
+      securitySchemesArray: [],
+      securityArray: [],
+    });
+    setJsonInput('');
+    setJsonError('');
+  };
+
   return (
     <div className="mx-auto pt-6 space-y-6">
       <Card>
         <CardHeader>
-          <h2 className="text-2xl font-bold text-center">Agent Registration Form</h2>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <FileText size={20} />
+            JSON Import
+          </h3>
         </CardHeader>
+        <CardBody>
+          <div className="space-y-4">
+
+            <Textarea
+              placeholder="Paste your AgentCard JSON here..."
+              value={jsonInput}
+              onChange={(e) => setJsonInput(e.target.value)}
+              minRows={6}
+              isInvalid={!!jsonError}
+              errorMessage={jsonError}
+              description="Support complete AgentCard JSON format data"
+            />
+
+            <div className="flex gap-2">
+              <Button
+                color="primary"
+                variant="flat"
+                onPress={() => parseJsonData()}
+                disabled={!jsonInput.trim() && !isLoading}
+              >
+                Parse
+              </Button>
+
+              <Button
+                color="warning"
+                variant="flat"
+                onPress={clearForm}
+              >
+                Clear Form
+              </Button>
+
+              {process.env.NODE_ENV === 'development' && (
+                <Button
+                  color="warning"
+                  variant="flat"
+                  onPress={parseTestData}
+                >
+                  Parse Test Data
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
         <CardBody>
           <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Basic Information</h3>
 
-              <Input
-                {...register('name', { required: 'Agent name is required' })}
-                label="Agent Name"
-                placeholder="Enter Agent Name"
-                isInvalid={!!errors.name}
-                errorMessage={errors.name?.message}
-                isRequired
+
+              <Controller
+                name="name"
+                control={control}
+                rules={{ required: 'Agent name is required' }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Agent Name"
+                    placeholder="Enter Agent Name"
+                    isInvalid={!!errors.name}
+                    errorMessage={errors.name?.message}
+                    isRequired
+                  />
+                )}
               />
 
-              <Textarea
-                {...register('description', { required: 'Agent description is required' })}
-                label="Description"
-                placeholder="Describe the functionality and purpose of the Agent"
-                isInvalid={!!errors.description}
-                errorMessage={errors.description?.message}
-                isRequired
+              <Controller
+                name="description"
+                control={control}
+                rules={{ required: 'Agent description is required' }}
+                render={({ field }) => (
+                  <Textarea
+                    {...field}
+                    label="Description"
+                    placeholder="Describe the functionality and purpose of the Agent"
+                    isInvalid={!!errors.description}
+                    errorMessage={errors.description?.message}
+                    isRequired
+                  />
+                )}
               />
 
-              <Input
-                {...register('url', {
+              <Controller
+                name="url"
+                control={control}
+                rules={{
                   required: 'Agent URL is required',
                   pattern: {
                     value: /^https?:\/\/.+/,
                     message: 'Please enter a valid URL (http:// or https://)'
                   }
-                })}
-                label="Agent URL"
-                placeholder="https://example.com/agent"
-                isInvalid={!!errors.url}
-                errorMessage={errors.url?.message}
-                isRequired
+                }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Agent URL"
+                    placeholder="https://example.com/agent"
+                    isInvalid={!!errors.url}
+                    errorMessage={errors.url?.message}
+                    isRequired
+                  />
+                )}
               />
 
-              <Input
-                {...register('iconUrl', {
+              <Controller
+                name="iconUrl"
+                control={control}
+                rules={{
                   pattern: {
                     value: /^https?:\/\/.+/,
                     message: 'Please enter a valid URL'
                   }
-                })}
-                label="Icon URL"
-                placeholder="https://example.com/icon.png"
-                isInvalid={!!errors.iconUrl}
-                errorMessage={errors.iconUrl?.message}
+                }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Icon URL"
+                    placeholder="https://example.com/icon.png"
+                    isInvalid={!!errors.iconUrl}
+                    errorMessage={errors.iconUrl?.message}
+                  />
+                )}
               />
 
-              <Input
-                {...register('version', { required: 'Version is required' })}
-                label="Version"
-                placeholder="1.0.0"
-                isInvalid={!!errors.version}
-                errorMessage={errors.version?.message}
-                isRequired
+              <Controller
+                name="version"
+                control={control}
+                rules={{ required: 'Version is required' }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Version"
+                    placeholder="1.0.0"
+                    isInvalid={!!errors.version}
+                    errorMessage={errors.version?.message}
+                    isRequired
+                  />
+                )}
               />
 
-              <Input
-                {...register('documentationUrl', {
+              <Controller
+                name="documentationUrl"
+                control={control}
+                rules={{
                   pattern: {
                     value: /^https?:\/\/.+/,
                     message: 'Please enter a valid URL'
                   }
-                })}
-                label="Documentation URL"
-                placeholder="https://example.com/docs"
-                isInvalid={!!errors.documentationUrl}
-                errorMessage={errors.documentationUrl?.message}
+                }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Documentation URL"
+                    placeholder="https://example.com/docs"
+                    isInvalid={!!errors.documentationUrl}
+                    errorMessage={errors.documentationUrl?.message}
+                  />
+                )}
               />
             </div>
 
@@ -241,23 +494,36 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Provider Information</h3>
 
-              <Input
-                {...register('provider.organization')}
-                label="Organization Name"
-                placeholder="Your organization name"
+              <Controller
+                name="provider.organization"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Organization Name"
+                    placeholder="Your organization name"
+                  />
+                )}
               />
 
-              <Input
-                {...register('provider.url', {
+              <Controller
+                name="provider.url"
+                control={control}
+                rules={{
                   pattern: {
                     value: /^https?:\/\/.+/,
                     message: 'Please enter a valid URL'
                   }
-                })}
-                label="Organization URL"
-                placeholder="https://your-organization.com"
-                isInvalid={!!errors.provider?.url}
-                errorMessage={errors.provider?.url?.message}
+                }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Organization URL"
+                    placeholder="https://your-organization.com"
+                    isInvalid={!!errors.provider?.url}
+                    errorMessage={errors.provider?.url?.message}
+                  />
+                )}
               />
             </div>
 
@@ -304,13 +570,20 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       </Button>
                     </div>
 
-                    <Input
-                      {...register(`securitySchemesArray.${index}.schemeName`, { required: 'Scheme name is required' })}
-                      label="Scheme Name"
-                      placeholder="bearer_auth"
-                      isInvalid={!!errors.securitySchemesArray?.[index]?.schemeName}
-                      errorMessage={errors.securitySchemesArray?.[index]?.schemeName?.message}
-                      isRequired
+                    <Controller
+                      name={`securitySchemesArray.${index}.schemeName`}
+                      control={control}
+                      rules={{ required: 'Scheme name is required' }}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          label="Scheme Name"
+                          placeholder="bearer_auth"
+                          isInvalid={!!errors.securitySchemesArray?.[index]?.schemeName}
+                          errorMessage={errors.securitySchemesArray?.[index]?.schemeName?.message}
+                          isRequired
+                        />
+                      )}
                     />
 
                     <Controller
@@ -355,9 +628,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                             }
 
                             // Update the entire scheme object
-                            register(`securitySchemesArray.${index}.scheme`).onChange({
-                              target: { value: newScheme }
-                            });
+                            setValue(`securitySchemesArray.${index}.scheme`, newScheme);
                           }}
                           isRequired
                         >
@@ -392,60 +663,94 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           )}
                         />
 
-                        <Input
-                          {...register(`securitySchemesArray.${index}.scheme.name`, { required: 'API key name is required' })}
-                          label="API Key Name"
-                          placeholder="X-API-Key"
-                          isRequired
+                        <Controller
+                          name={`securitySchemesArray.${index}.scheme.name`}
+                          control={control}
+                          rules={{ required: 'API key name is required' }}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              label="API Key Name"
+                              placeholder="X-API-Key"
+                              isRequired
+                            />
+                          )}
                         />
                       </>
                     )}
 
                     {watch(`securitySchemesArray.${index}.scheme.type`) === 'http' && (
                       <>
-                        <Input
-                          {...register(`securitySchemesArray.${index}.scheme.scheme`, { required: 'HTTP scheme is required' })}
-                          label="HTTP Scheme"
-                          placeholder="bearer"
-                          isRequired
+                        <Controller
+                          name={`securitySchemesArray.${index}.scheme.scheme`}
+                          control={control}
+                          rules={{ required: 'HTTP scheme is required' }}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              label="HTTP Scheme"
+                              placeholder="bearer"
+                              isRequired
+                            />
+                          )}
                         />
 
-                        <Input
-                          {...register(`securitySchemesArray.${index}.scheme.bearerFormat`)}
-                          label="Bearer Format"
-                          placeholder="JWT"
+                        <Controller
+                          name={`securitySchemesArray.${index}.scheme.bearerFormat`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              label="Bearer Format"
+                              placeholder="JWT"
+                            />
+                          )}
                         />
                       </>
                     )}
 
                     {watch(`securitySchemesArray.${index}.scheme.type`) === 'openIdConnect' && (
-                      <Input
-                        {...register(`securitySchemesArray.${index}.scheme.openIdConnectUrl`, {
+                      <Controller
+                        name={`securitySchemesArray.${index}.scheme.openIdConnectUrl`}
+                        control={control}
+                        rules={{
                           required: 'OpenID Connect URL is required',
                           pattern: {
                             value: /^https?:\/\/.+/,
                             message: 'Please enter a valid URL'
                           }
-                        })}
-                        label="OpenID Connect URL"
-                        placeholder="https://example.com/.well-known/openid_configuration"
-                        isRequired
+                        }}
+                        render={({ field }) => (
+                          <Input
+                            {...field}
+                            label="OpenID Connect URL"
+                            placeholder="https://example.com/.well-known/openid_configuration"
+                            isRequired
+                          />
+                        )}
                       />
                     )}
 
                     {watch(`securitySchemesArray.${index}.scheme.type`) === 'oauth2' && (
                       <div className="space-y-4">
-                        <Input
-                          {...register(`securitySchemesArray.${index}.scheme.flows.clientCredentials.tokenUrl`, {
+                        <Controller
+                          name={`securitySchemesArray.${index}.scheme.flows.clientCredentials.tokenUrl`}
+                          control={control}
+                          rules={{
                             required: 'Token URL is required',
                             pattern: {
                               value: /^https?:\/\/.+/,
                               message: 'Please enter a valid URL'
                             }
-                          })}
-                          label="Token URL"
-                          placeholder="https://example.com/oauth/token"
-                          isRequired
+                          }}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              label="Token URL"
+                              placeholder="https://example.com/oauth/token"
+                              isRequired
+                            />
+                          )}
                         />
 
                         <Controller
@@ -474,10 +779,16 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       </div>
                     )}
 
-                    <Textarea
-                      {...register(`securitySchemesArray.${index}.scheme.description`)}
-                      label="Description"
-                      placeholder="Describe this security scheme"
+                    <Controller
+                      name={`securitySchemesArray.${index}.scheme.description`}
+                      control={control}
+                      render={({ field }) => (
+                        <Textarea
+                          {...field}
+                          label="Description"
+                          placeholder="Describe this security scheme"
+                        />
+                      )}
                     />
                   </div>
                 </Card>
@@ -729,31 +1040,52 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       </Button>
                     </div>
 
-                    <Input
-                      {...register(`skills.${index}.id`, { required: 'Skill ID is required' })}
-                      label="Skill ID"
-                      placeholder="skill-unique-id"
-                      isInvalid={!!errors.skills?.[index]?.id}
-                      errorMessage={errors.skills?.[index]?.id?.message}
-                      isRequired
+                    <Controller
+                      name={`skills.${index}.id`}
+                      control={control}
+                      rules={{ required: 'Skill ID is required' }}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          label="Skill ID"
+                          placeholder="skill-unique-id"
+                          isInvalid={!!errors.skills?.[index]?.id}
+                          errorMessage={errors.skills?.[index]?.id?.message}
+                          isRequired
+                        />
+                      )}
                     />
 
-                    <Input
-                      {...register(`skills.${index}.name`, { required: 'Skill name is required' })}
-                      label="Skill Name"
-                      placeholder="Skill Name"
-                      isInvalid={!!errors.skills?.[index]?.name}
-                      errorMessage={errors.skills?.[index]?.name?.message}
-                      isRequired
+                    <Controller
+                      name={`skills.${index}.name`}
+                      control={control}
+                      rules={{ required: 'Skill name is required' }}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          label="Skill Name"
+                          placeholder="Skill Name"
+                          isInvalid={!!errors.skills?.[index]?.name}
+                          errorMessage={errors.skills?.[index]?.name?.message}
+                          isRequired
+                        />
+                      )}
                     />
 
-                    <Textarea
-                      {...register(`skills.${index}.description`, { required: 'Skill description is required' })}
-                      label="Skill Description"
-                      placeholder="Describe the functionality of this skill"
-                      isInvalid={!!errors.skills?.[index]?.description}
-                      errorMessage={errors.skills?.[index]?.description?.message}
-                      isRequired
+                    <Controller
+                      name={`skills.${index}.description`}
+                      control={control}
+                      rules={{ required: 'Skill description is required' }}
+                      render={({ field }) => (
+                        <Textarea
+                          {...field}
+                          label="Skill Description"
+                          placeholder="Describe the functionality of this skill"
+                          isInvalid={!!errors.skills?.[index]?.description}
+                          errorMessage={errors.skills?.[index]?.description?.message}
+                          isRequired
+                        />
+                      )}
                     />
 
                     <Controller
