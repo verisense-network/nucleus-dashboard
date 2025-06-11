@@ -9,11 +9,9 @@ export async function agentRegister(agentCard: AgentCard): Promise<string> {
   const [
     { setupSigner },
     { usePolkadotWalletStore },
-    { Keyring }
   ] = await Promise.all([
     import("@/utils/polkadot-signer"),
     import("@/stores/polkadot-wallet"),
-    import("@polkadot/api")
   ]);
 
   const api = await getPolkadotApi();
@@ -26,12 +24,9 @@ export async function agentRegister(agentCard: AgentCard): Promise<string> {
   if (!account) {
     throw new Error('please connect wallet and select account');
   }
-  const keyring = new Keyring({ type: 'sr25519' });
-  
-  const alice = keyring.addFromUri('//Alice');
 
   return new Promise((resolve, reject) => {
-    extrinsic.signAndSend(alice, (result) => {
+    extrinsic.signAndSend(account.address, (result) => {
       if (result.status.isInBlock) {
         console.log('transaction included in block:', result.status.asInBlock.toHex());
       } else if (result.status.isFinalized) {

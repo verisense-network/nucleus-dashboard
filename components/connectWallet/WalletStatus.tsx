@@ -1,13 +1,23 @@
 "use client";
 
-import React, { Key } from "react";
+import React, { Key, useEffect, useMemo } from "react";
 import { Button, User, DropdownTrigger, DropdownMenu, DropdownItem, Dropdown } from "@heroui/react";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { Wallet } from "lucide-react";
 import { toast } from "react-toastify";
 
 export function WalletStatus() {
-  const { isConnected, selectedAccount, connectWallet, isConnecting, disconnectWallet } = usePolkadotWalletStore();
+  const { isConnected, selectedAccount, connectWallet, isConnecting, disconnectWallet, balance, symbol, updateBalance } = usePolkadotWalletStore();
+
+  const formattedBalance = useMemo(() => {
+    return `${balance} ${symbol}`;
+  }, [balance, symbol])
+
+  useEffect(() => {
+    if (selectedAccount) {
+      updateBalance();
+    }
+  }, [selectedAccount, updateBalance])
 
   if (!isConnected) {
     return (
@@ -60,6 +70,9 @@ export function WalletStatus() {
           />
         </DropdownTrigger>
         <DropdownMenu aria-label="Wallet Actions" onAction={handleAction}>
+          <DropdownItem key="balance">
+            {formattedBalance}
+          </DropdownItem>
           <DropdownItem key="copy-address">
             Copy Address
           </DropdownItem>

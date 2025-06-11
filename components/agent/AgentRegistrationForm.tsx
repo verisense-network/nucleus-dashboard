@@ -5,7 +5,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { Button } from '@heroui/react';
 import { Card, CardBody, CardHeader } from '@heroui/react';
 import { Input, Textarea, Select, SelectItem } from '@heroui/react';
-import { Checkbox } from '@heroui/react';
+import { Checkbox, Switch } from '@heroui/react';
 import { Divider } from '@heroui/react';
 import { Plus, Trash2 } from 'lucide-react';
 import { AgentCard, SecurityScheme } from '@/types/a2a';
@@ -68,20 +68,20 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
         url: initialData?.provider?.url || '',
       },
       // Convert securitySchemes object to array for form handling
-      securitySchemesArray: initialData?.securitySchemes 
+      securitySchemesArray: initialData?.securitySchemes
         ? Object.entries(initialData.securitySchemes).map(([schemeName, scheme]) => ({
-            schemeName,
-            scheme,
-          }))
+          schemeName,
+          scheme,
+        }))
         : [],
       // Convert security array to form-friendly format
-      securityArray: initialData?.security 
+      securityArray: initialData?.security
         ? initialData.security.flatMap(requirement =>
-            Object.entries(requirement).map(([schemeName, scopes]) => ({
-              schemeName,
-              scopes: Array.isArray(scopes) ? scopes : [],
-            }))
-          )
+          Object.entries(requirement).map(([schemeName, scopes]) => ({
+            schemeName,
+            scopes: Array.isArray(scopes) ? scopes : [],
+          }))
+        )
         : [],
     },
   });
@@ -151,7 +151,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       documentationUrl: data.documentationUrl || undefined,
       provider: data.provider?.organization ? data.provider : undefined,
     };
-    
+
     await onSubmit(agentCardData);
     reset();
   };
@@ -166,7 +166,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
           <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Basic Information</h3>
-              
+
               <Input
                 {...register('name', { required: 'Agent name is required' })}
                 label="Agent Name"
@@ -186,7 +186,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
               />
 
               <Input
-                {...register('url', { 
+                {...register('url', {
                   required: 'Agent URL is required',
                   pattern: {
                     value: /^https?:\/\/.+/,
@@ -240,7 +240,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Provider Information</h3>
-              
+
               <Input
                 {...register('provider.organization')}
                 label="Organization Name"
@@ -272,7 +272,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                   color="primary"
                   variant="flat"
                   startContent={<Plus size={16} />}
-                  onPress={() => 
+                  onPress={() =>
                     appendSecurityScheme({
                       schemeName: '',
                       scheme: {
@@ -324,11 +324,11 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           onSelectionChange={(keys) => {
                             const selectedType = Array.from(keys)[0] as string;
                             field.onChange(selectedType);
-                            
+
                             // Reset scheme-specific fields when type changes
                             const currentScheme = watch(`securitySchemesArray.${index}.scheme`);
                             let newScheme: SecurityScheme;
-                            
+
                             switch (selectedType) {
                               case 'apiKey':
                                 newScheme = { type: 'apiKey', in: 'header', name: '' };
@@ -337,8 +337,8 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                                 newScheme = { type: 'http', scheme: '' };
                                 break;
                               case 'oauth2':
-                                newScheme = { 
-                                  type: 'oauth2', 
+                                newScheme = {
+                                  type: 'oauth2',
                                   flows: {
                                     clientCredentials: {
                                       tokenUrl: '',
@@ -353,7 +353,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                               default:
                                 newScheme = currentScheme;
                             }
-                            
+
                             // Update the entire scheme object
                             register(`securitySchemesArray.${index}.scheme`).onChange({
                               target: { value: newScheme }
@@ -391,7 +391,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                             </Select>
                           )}
                         />
-                        
+
                         <Input
                           {...register(`securitySchemesArray.${index}.scheme.name`, { required: 'API key name is required' })}
                           label="API Key Name"
@@ -409,7 +409,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           placeholder="bearer"
                           isRequired
                         />
-                        
+
                         <Input
                           {...register(`securitySchemesArray.${index}.scheme.bearerFormat`)}
                           label="Bearer Format"
@@ -420,7 +420,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
 
                     {watch(`securitySchemesArray.${index}.scheme.type`) === 'openIdConnect' && (
                       <Input
-                        {...register(`securitySchemesArray.${index}.scheme.openIdConnectUrl`, { 
+                        {...register(`securitySchemesArray.${index}.scheme.openIdConnectUrl`, {
                           required: 'OpenID Connect URL is required',
                           pattern: {
                             value: /^https?:\/\/.+/,
@@ -436,7 +436,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     {watch(`securitySchemesArray.${index}.scheme.type`) === 'oauth2' && (
                       <div className="space-y-4">
                         <Input
-                          {...register(`securitySchemesArray.${index}.scheme.flows.clientCredentials.tokenUrl`, { 
+                          {...register(`securitySchemesArray.${index}.scheme.flows.clientCredentials.tokenUrl`, {
                             required: 'Token URL is required',
                             pattern: {
                               value: /^https?:\/\/.+/,
@@ -447,23 +447,27 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           placeholder="https://example.com/oauth/token"
                           isRequired
                         />
-                        
+
                         <Controller
                           name={`securitySchemesArray.${index}.scheme.flows.clientCredentials.scopes`}
                           control={control}
                           render={({ field }) => (
                             <Textarea
                               label="Scopes (JSON)"
-                              placeholder='{"read": "Read access", "write": "Write access"}'
-                              value={typeof field.value === 'object' ? JSON.stringify(field.value, null, 2) : ''}
+                              placeholder={'{"read": "Read access", "write": "Write access"}'}
+                              value={field.value && typeof field.value === 'object' ? JSON.stringify(field.value, null, 2) : field.value || '{}'}
                               onChange={(e) => {
+                                const newValue = e.target.value;
                                 try {
-                                  const scopes = JSON.parse(e.target.value || '{}');
-                                  field.onChange(scopes);
+                                  const scopes = JSON.parse(newValue || '{}');
+                                  if (typeof scopes === 'object' && scopes !== null) {
+                                    field.onChange(scopes);
+                                  }
                                 } catch {
-                                  // Invalid JSON, keep current value
+                                  // Keep the string value for invalid JSON
                                 }
                               }}
+                              description="Enter valid JSON format for scopes"
                             />
                           )}
                         />
@@ -497,7 +501,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                   color="primary"
                   variant="flat"
                   startContent={<Plus size={16} />}
-                  onPress={() => 
+                  onPress={() =>
                     appendSecurity({
                       schemeName: '',
                       scopes: [],
@@ -582,7 +586,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Agent Capabilities</h3>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <Controller
                   name="capabilities.streaming"
@@ -622,19 +626,6 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     </Checkbox>
                   )}
                 />
-
-                <Controller
-                  name="supportsAuthenticatedExtendedCard"
-                  control={control}
-                  render={({ field }) => (
-                    <Checkbox
-                      isSelected={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      Supports authenticated extended card
-                    </Checkbox>
-                  )}
-                />
               </div>
             </div>
 
@@ -642,7 +633,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Media Type Support</h3>
-              
+
               <Controller
                 name="defaultInputModes"
                 control={control}
@@ -705,7 +696,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                   color="primary"
                   variant="flat"
                   startContent={<Plus size={16} />}
-                  onPress={() => 
+                  onPress={() =>
                     appendSkill({
                       id: '',
                       name: '',
@@ -799,6 +790,37 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                   </div>
                 </Card>
               ))}
+            </div>
+
+            <Divider />
+
+            <div className="space-y-4">
+              <Controller
+                name="supportsAuthenticatedExtendedCard"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex w-full">
+                    <Switch
+                      isSelected={field.value}
+                      onValueChange={field.onChange}
+                      size="lg"
+                      color="primary"
+                      classNames={{
+                        base: "inline-flex flex-row-reverse w-full max-w-full bg-content1 hover:bg-content2 items-center justify-between cursor-pointer rounded-lg gap-2 p-4 border-2 border-gray-200 data-[selected=true]:border-primary",
+                        wrapper: "p-0 h-4 overflow-visible",
+                        thumb: "w-6 h-6 border-2 border-white shadow-lg group-data-[hover=true]:border-primary group-data-[selected=true]:ml-8 group-data-[selected=true]:border-primary rtl:group-data-[selected=true]:ml-0 rtl:group-data-[selected=true]:mr-8"
+                      }}
+                    >
+                      <div className="flex flex-col gap-1">
+                        <p className="text-medium">Supports Authenticated Extended Card</p>
+                        <p className="text-tiny text-default-400">
+                          True if the agent supports providing an extended agent card when the user is authenticated.
+                        </p>
+                      </div>
+                    </Switch>
+                  </div>
+                )}
+              />
             </div>
 
             <Divider />
