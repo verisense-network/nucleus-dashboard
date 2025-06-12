@@ -2446,9 +2446,9 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     if (!codecClass.debugMode) return null;
 
     return (
-      <div className="mt-4 p-4 bg-blue-50 rounded-lg space-y-4">
+      <div className="mt-4 p-4 bg-blue-50 dark:bg-zinc-950 rounded-lg space-y-4">
         <div className="flex items-center justify-between">
-          <h5 className="font-semibold text-blue-800">Debug Type</h5>
+          <h5 className="font-semibold text-blue-800 dark:text-blue-200">Debug Type</h5>
           <Button
             size="sm"
             color="primary"
@@ -2461,7 +2461,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Struct debug */}
         {codecClass.type === 'Struct' && codecClass.fields && codecClass.fields.length > 0 && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Struct Fields:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Struct Fields:</h6>
             {codecClass.fields.map((field, fieldIndex) =>
               renderFieldInput(field, classIndex, field.name, 0)
             )}
@@ -2471,7 +2471,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Enum debug */}
         {codecClass.type === 'Enum' && codecClass.variants && codecClass.variants.length > 0 && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Enum Variants:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Enum Variants:</h6>
             <Select
               size="sm"
               label="Select Variant"
@@ -2548,7 +2548,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Union debug */}
         {codecClass.type === 'Union' && codecClass.variants && codecClass.variants.length > 0 && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Union Type Options:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Union Type Options:</h6>
             <Select
               size="sm"
               label="Select Type"
@@ -2582,7 +2582,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* TypeAlias debug */}
         {codecClass.type === 'TypeAlias' && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Type Alias Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Type Alias Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Alias Type: <span className="font-mono">{codecClass.valueType}</span>
             </div>
@@ -2599,7 +2599,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* ConstExport debug */}
         {codecClass.type === 'ConstExport' && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Const Export Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Const Export Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Const Type: <span className="font-mono">{codecClass.valueType}</span>
             </div>
@@ -2617,7 +2617,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {codecClass.type === 'VecFixed' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h6 className="text-sm font-medium text-blue-700">
+              <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">
                 VecFixed Value (Length: {codecClass.length})
               </h6>
               <Button
@@ -2654,7 +2654,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Base type debug (Vec, U8aFixed, UInt, Int) */}
         {['U8aFixed', 'UInt', 'Int'].includes(codecClass.type) && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">{codecClass.type} Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">{codecClass.type} Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Base Type: <span className="font-mono">{codecClass.baseType}</span>
               {codecClass.type === 'U8aFixed' && codecClass.baseType?.includes('<') && (
@@ -2677,7 +2677,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {codecClass.type === 'Vec' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h6 className="text-sm font-medium text-blue-700">Vec Value:</h6>
+              <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Vec Value:</h6>
               <Button
                 size="sm"
                 variant="flat"
@@ -2736,7 +2736,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Integer debug */}
         {codecClass.type === 'Integer' && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Integer Type Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Integer Type Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Integer Type: <span className="font-mono">{codecClass.baseType}</span>
             </div>
@@ -2754,7 +2754,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Boolean debug */}
         {codecClass.type === 'Boolean' && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Boolean Type Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Boolean Type Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Boolean Type: <span className="font-mono">{codecClass.baseType}</span>
             </div>
@@ -2777,7 +2777,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Text debug */}
         {codecClass.type === 'Text' && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Text Type Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Text Type Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Text Type: <span className="font-mono">{codecClass.baseType}</span>
             </div>
@@ -2794,7 +2794,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Hash debug */}
         {codecClass.type === 'Hash' && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Hash Type Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Hash Type Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Hash Type: <span className="font-mono">{codecClass.baseType}</span>
               {codecClass.baseType === 'H160' && <span> (Ethereum address format)</span>}
@@ -2819,7 +2819,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Option debug */}
         {codecClass.type === 'Option' && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Option Type Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Option Type Value:</h6>
             <div className="text-xs text-default-500 mb-2">
               Option Type: <span className="font-mono">{codecClass.baseType}</span>
             </div>
@@ -2848,7 +2848,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Common value debug for other types */}
         {!['Struct', 'Enum', 'Union', 'TypeAlias', 'ConstExport', 'VecFixed', 'Vec', 'U8aFixed', 'UInt', 'Int', 'Namespace', 'Integer', 'Boolean', 'Text', 'Hash', 'Option'].includes(codecClass.type) && (
           <div className="space-y-3">
-            <h6 className="text-sm font-medium text-blue-700">Value:</h6>
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Value:</h6>
             <Input
               size="sm"
               label={`${codecClass.type} Value`}
@@ -2862,8 +2862,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Debug result */}
         {codecClass.debugResult && (
           <div className="space-y-2">
-            <h6 className="text-sm font-medium text-blue-700">Result:</h6>
-            <pre className="text-xs bg-gray-100 p-2 rounded border overflow-auto max-h-40">
+            <h6 className="text-sm font-medium text-blue-700 dark:text-blue-200">Result:</h6>
+            <pre className="text-xs bg-gray-100 dark:bg-zinc-950 p-2 rounded border dark:border-zinc-800 overflow-auto max-h-40">
               {codecClass.debugResult}
             </pre>
           </div>
@@ -2876,9 +2876,9 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
     if (!func.debugMode) return null;
 
     return (
-      <div className="mt-4 p-4 bg-green-50 rounded-lg space-y-4">
+      <div className="mt-4 p-4 bg-green-50 dark:bg-zinc-950 rounded-lg space-y-4">
         <div className="flex items-center justify-between">
-          <h5 className="font-semibold text-green-800">Debug Function</h5>
+          <h5 className="font-semibold text-green-800 dark:text-green-200">Debug Function</h5>
           <Button
             size="sm"
             color="success"
@@ -2900,8 +2900,8 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         {/* Function debug result */}
         {func.debugResult && (
           <div className="space-y-2">
-            <h6 className="text-sm font-medium text-green-700">Result:</h6>
-            <pre className="text-xs bg-gray-100 p-2 rounded border overflow-auto max-h-40">
+            <h6 className="text-sm font-medium text-green-700 dark:text-green-200">Result:</h6>
+            <pre className="text-xs bg-gray-100 dark:bg-zinc-950 p-2 rounded border dark:border-zinc-800 overflow-auto max-h-40">
               {func.debugResult}
             </pre>
           </div>
