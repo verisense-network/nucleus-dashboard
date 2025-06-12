@@ -10,14 +10,17 @@ import { Divider } from '@heroui/react';
 import { Plus, Trash2, FileText } from 'lucide-react';
 import { AgentCard, SecurityScheme } from '@/types/a2a';
 import { TagsInput } from '../input/TagsInput';
+import { OAuth2FlowsInput } from '../input/OAuth2FlowsInput';
+import { Id, toast } from 'react-toastify';
 
-// Helper type for form data to handle securitySchemes as an array
+
 interface SecuritySchemeFormData {
   schemeName: string;
-  scheme: SecurityScheme;
+  scheme: SecurityScheme & {
+    flows?: any;
+  };
 }
 
-// Helper type for security requirements
 interface SecurityRequirementFormData {
   schemeName: string;
   scopes: string[];
@@ -29,8 +32,7 @@ interface FormData extends Omit<AgentCard, 'securitySchemes' | 'security'> {
 }
 
 interface AgentRegistrationFormProps {
-  onSubmit: (data: AgentCard) => Promise<void>;
-  initialData?: Partial<AgentCard>;
+  onSubmit: (data: AgentCard, toastId: Id) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -75,7 +77,7 @@ const testData = {
   },
   "securitySchemesArray": [
     {
-      "schemeName": "test",
+      "schemeName": "api_key",
       "scheme": {
         "type": "apiKey",
         "in": "header",
@@ -84,42 +86,47 @@ const testData = {
       }
     },
     {
-      "schemeName": "test1",
+      "schemeName": "oauth2_standard",
       "scheme": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "1111",
-        "description": "111111"
+        "type": "oauth2",
+        "description": "OAuth2 Standard",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://example.com/oauth/authorize",
+            "tokenUrl": "https://example.com/oauth/token",
+            "refreshUrl": "https://example.com/oauth/refresh",
+            "scopesArray": [
+              {"name": "read", "description": "read permission"},
+              {"name": "write", "description": "write permission"}
+            ]
+          }
+        }
       }
     }
   ],
   "securityArray": [
     {
-      "schemeName": "test",
-      "scopes": [
-        "write"
-      ]
+      "schemeName": "api_key",
+      "scopes": []
     },
     {
-      "schemeName": "test1",
+      "schemeName": "oauth2_standard",
       "scopes": [
-        "admin"
+        "read", "write"
       ]
     }
   ],
   "securitySchemes": {
-    "test": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"X-API-Key\",\"description\":\"afsafdsfdasafdsfadasfd\"}",
-    "test1": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"1111\",\"description\":\"111111\"}"
+    "api_key": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"X-API-Key\",\"description\":\"API Key Authentication\"}",
+    "oauth2_standard": "{\"type\":\"oauth2\",\"description\":\"OAuth2 Standard\",\"flows\":{\"authorizationCode\":{\"authorizationUrl\":\"https://example.com/oauth/authorize\",\"tokenUrl\":\"https://example.com/oauth/token\",\"refreshUrl\":\"https://example.com/oauth/refresh\",\"scopes\":{\"read\":\"read permission\",\"write\":\"write permission\"}}}}"
   },
   "security": [
     {
-      "test": [
-        "write"
-      ]
+      "api_key": ["read"]
     },
     {
-      "test1": [
-        "admin"
+      "oauth2_standard": [
+        "read", "write"
       ]
     }
   ]
@@ -127,7 +134,6 @@ const testData = {
 
 export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   onSubmit,
-  initialData,
   isLoading = false,
 }) => {
   const [jsonInput, setJsonInput] = useState('');
@@ -142,42 +148,30 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      name: initialData?.name || '',
-      description: initialData?.description || '',
-      url: initialData?.url || '',
-      iconUrl: initialData?.iconUrl || '',
-      version: initialData?.version || '1.0.0',
-      documentationUrl: initialData?.documentationUrl || '',
+      name: '',
+      description: '',
+      url: '',
+      iconUrl: '',
+      version: '1.0.0',
+      documentationUrl: '',
       capabilities: {
-        streaming: initialData?.capabilities?.streaming || false,
-        pushNotifications: initialData?.capabilities?.pushNotifications || false,
-        stateTransitionHistory: initialData?.capabilities?.stateTransitionHistory || false,
-        extensions: initialData?.capabilities?.extensions || [],
+        streaming: false,
+        pushNotifications: false,
+        stateTransitionHistory: false,
+        extensions: [],
       },
-      defaultInputModes: initialData?.defaultInputModes || ['text/plain'],
-      defaultOutputModes: initialData?.defaultOutputModes || ['text/plain'],
-      skills: initialData?.skills || [],
-      supportsAuthenticatedExtendedCard: initialData?.supportsAuthenticatedExtendedCard || false,
+      defaultInputModes: ['text/plain'],
+      defaultOutputModes: ['text/plain'],
+      skills: [],
+      supportsAuthenticatedExtendedCard: false,
       provider: {
-        organization: initialData?.provider?.organization || '',
-        url: initialData?.provider?.url || '',
+        organization: '',
+        url: '',
       },
       // Convert securitySchemes object to array for form handling
-      securitySchemesArray: initialData?.securitySchemes
-        ? Object.entries(initialData.securitySchemes).map(([schemeName, scheme]) => ({
-          schemeName,
-          scheme,
-        }))
-        : [],
+      securitySchemesArray: [],
       // Convert security array to form-friendly format
-      securityArray: initialData?.security
-        ? initialData.security.flatMap(requirement =>
-          Object.entries(requirement).map(([schemeName, scopes]) => ({
-            schemeName,
-            scopes: Array.isArray(scopes) ? scopes : [],
-          }))
-        )
-        : [],
+      securityArray: [],
     },
   });
 
@@ -222,11 +216,42 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   ];
 
   const handleFormSubmit = async (data: FormData) => {
+    const toastId = toast.loading('Continue in your wallet...');
     // Convert securitySchemesArray back to securitySchemes object
     const securitySchemes: { [scheme: string]: SecurityScheme } = {};
     data.securitySchemesArray?.forEach(({ schemeName, scheme }) => {
       if (schemeName && scheme) {
-        securitySchemes[schemeName] = JSON.stringify(scheme) as any; // force to string
+        let processedScheme = { ...scheme };
+
+        if (scheme.type === 'oauth2' && scheme.flows) {
+          const processedFlows: any = {};
+
+          Object.entries(scheme.flows).forEach(([flowType, flowConfig]: [string, any]) => {
+            if (flowConfig && typeof flowConfig === 'object') {
+              const processedFlow = { ...flowConfig };
+              
+              if (flowConfig.scopesArray && Array.isArray(flowConfig.scopesArray)) {
+                const scopes: { [name: string]: string } = {};
+                flowConfig.scopesArray.forEach(({ name, description }: any) => {
+                  if (name?.trim()) {
+                    scopes[name.trim()] = description?.trim() || '';
+                  }
+                });
+                processedFlow.scopes = scopes;
+                delete processedFlow.scopesArray;
+              }
+              
+              processedFlows[flowType] = processedFlow;
+            }
+          });
+
+          processedScheme = {
+            ...scheme,
+            flows: processedFlows,
+          };
+        }
+
+        securitySchemes[schemeName] = JSON.stringify(processedScheme) as any; // force to string
       }
     });
 
@@ -247,7 +272,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       provider: data.provider?.organization ? data.provider : undefined,
     };
 
-    await onSubmit(agentCardData);
+    await onSubmit(agentCardData, toastId);
     reset();
   };
 
@@ -263,10 +288,43 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       const formData: Partial<FormData> = {
         ...parsedData,
         securitySchemesArray: parsedData.securitySchemes
-          ? Object.entries(parsedData.securitySchemes).map(([schemeName, scheme]) => ({
-            schemeName,
-            scheme: JSON.parse(scheme as string),
-          }))
+          ? Object.entries(parsedData.securitySchemes).map(([schemeName, scheme]) => {
+            const parsedScheme = JSON.parse(scheme as string);
+
+            // Convert scopes object to array for OAuth2
+            if (parsedScheme.type === 'oauth2' && parsedScheme.flows) {
+              const processedFlows: any = {};
+              
+              Object.entries(parsedScheme.flows).forEach(([flowType, flowConfig]: [string, any]) => {
+                if (flowConfig && typeof flowConfig === 'object') {
+                  const processedFlow = { ...flowConfig };
+                  
+                  if (flowConfig.scopes && typeof flowConfig.scopes === 'object') {
+                    const scopesArray = Object.entries(flowConfig.scopes).map(([name, description]) => ({
+                      name,
+                      description: description as string,
+                    }));
+                    processedFlow.scopesArray = scopesArray;
+                  }
+                  
+                  processedFlows[flowType] = processedFlow;
+                }
+              });
+
+              return {
+                schemeName,
+                scheme: {
+                  ...parsedScheme,
+                  flows: processedFlows,
+                },
+              };
+            }
+
+            return {
+              schemeName,
+              scheme: parsedScheme,
+            };
+          })
           : [],
         securityArray: parsedData.security
           ? parsedData.security.flatMap((requirement: any) =>
@@ -614,8 +672,10 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                                 newScheme = {
                                   type: 'oauth2',
                                   flows: {
-                                    clientCredentials: {
+                                    authorizationCode: {
+                                      authorizationUrl: '',
                                       tokenUrl: '',
+                                      refreshUrl: '',
                                       scopes: {},
                                     },
                                   },
@@ -733,51 +793,12 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     )}
 
                     {watch(`securitySchemesArray.${index}.scheme.type`) === 'oauth2' && (
-                      <div className="space-y-4">
-                        <Controller
-                          name={`securitySchemesArray.${index}.scheme.flows.clientCredentials.tokenUrl`}
-                          control={control}
-                          rules={{
-                            required: 'Token URL is required',
-                            pattern: {
-                              value: /^https?:\/\/.+/,
-                              message: 'Please enter a valid URL'
-                            }
-                          }}
-                          render={({ field }) => (
-                            <Input
-                              {...field}
-                              label="Token URL"
-                              placeholder="https://example.com/oauth/token"
-                              isRequired
-                            />
-                          )}
-                        />
-
-                        <Controller
-                          name={`securitySchemesArray.${index}.scheme.flows.clientCredentials.scopes`}
-                          control={control}
-                          render={({ field }) => (
-                            <Textarea
-                              label="Scopes (JSON)"
-                              placeholder={'{"read": "Read access", "write": "Write access"}'}
-                              value={field.value && typeof field.value === 'object' ? JSON.stringify(field.value, null, 2) : field.value || '{}'}
-                              onChange={(e) => {
-                                const newValue = e.target.value;
-                                try {
-                                  const scopes = JSON.parse(newValue || '{}');
-                                  if (typeof scopes === 'object' && scopes !== null) {
-                                    field.onChange(scopes);
-                                  }
-                                } catch {
-                                  // Keep the string value for invalid JSON
-                                }
-                              }}
-                              description="Enter valid JSON format for scopes"
-                            />
-                          )}
-                        />
-                      </div>
+                      <OAuth2FlowsInput
+                        name={`securitySchemesArray.${index}.scheme`}
+                        control={control}
+                        label="OAuth2 Flows"
+                        isRequired
+                      />
                     )}
 
                     <Controller

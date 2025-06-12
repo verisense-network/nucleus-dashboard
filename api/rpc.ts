@@ -1,7 +1,8 @@
 import { getPolkadotApi } from "@/lib/polkadotApi";
 import { AgentCard } from "@/types/a2a";
+import { Id, toast } from "react-toastify";
 
-export async function agentRegister(agentCard: AgentCard): Promise<string> {
+export async function agentRegister(agentCard: AgentCard, toastId: Id): Promise<string> {
   if (typeof window === 'undefined') {
     throw new Error('agentRegister can only be called in client environment');
   }
@@ -28,8 +29,19 @@ export async function agentRegister(agentCard: AgentCard): Promise<string> {
   return new Promise((resolve, reject) => {
     extrinsic.signAndSend(account.address, (result) => {
       if (result.status.isInBlock) {
+        toast.update(toastId, {
+          type: 'info',
+          render: 'Transaction included in block...',
+          isLoading: true,
+          autoClose: false,
+        });
         console.log('transaction included in block:', result.status.asInBlock.toHex());
       } else if (result.status.isFinalized) {
+        toast.update(toastId, {
+          type: 'success',
+          render: 'Transaction finalized!',
+          isLoading: false,
+        });
         console.log('transaction finalized:', result.status.asFinalized.toHex());
         resolve(result.status.asFinalized.toHex());
       }

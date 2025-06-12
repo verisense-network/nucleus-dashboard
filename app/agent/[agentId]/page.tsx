@@ -271,7 +271,7 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
         </CardHeader>
         <CardBody>
           <div className="space-y-4">
-            {agentCard.skills.map((skill, index) => (
+            {agentCard.skills.map((skill) => (
               <div key={skill.id} className="bg-default-50 rounded-lg p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>

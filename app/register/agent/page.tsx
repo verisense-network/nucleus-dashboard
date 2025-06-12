@@ -3,31 +3,44 @@
 import AgentRegistrationForm from "@/components/agent/AgentRegistrationForm";
 import { useState } from "react";
 import { AgentCard } from "@/types/a2a";
-import { toast } from "react-toastify";
+import { Id, toast } from "react-toastify";
 import { agentRegister } from "@/api/rpc";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 
 export default function AgentRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (data: AgentCard) => {
+  const handleSubmit = async (data: AgentCard, toastId: Id) => {
     setIsLoading(true);
+    console.log('data', data);
     try {
       const { isConnected, selectedAccount } = usePolkadotWalletStore.getState();
       
       if (!isConnected || !selectedAccount) {
-        toast.error('please connect wallet and select account');
+        toast.error('please connect wallet and select account', {
+          toastId: toastId,
+        });
         return;
       }
 
-      const finalizedHash = await agentRegister(data);
+      const finalizedHash = await agentRegister(data, toastId);
 
-      toast.success(`Agent registration successful! Transaction finalized: ${finalizedHash.slice(0, 10)}...`);
+      toast.update(toastId, {
+        type: 'success',
+        render: `Agent registration successful! Transaction finalized: ${finalizedHash.slice(0, 10)}...`,
+        isLoading: false,
+        autoClose: 3500,
+      });
       console.log('Transaction finalized with hash:', finalizedHash);
     } catch (error) {
       console.error('Registration failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed, please try again';
-      toast.error(errorMessage);
+      toast.update(toastId, {
+        type: 'error',
+        render: errorMessage,
+        isLoading: false,
+        autoClose: 3500,
+      });
     } finally {
       setIsLoading(false);
     }
