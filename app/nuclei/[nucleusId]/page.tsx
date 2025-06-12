@@ -17,7 +17,7 @@ interface NucleusDetailPageProps {
 
 export async function generateMetadata({ params }: NucleusDetailPageProps): Promise<Metadata> {
   const { nucleusId } = await params;
-  
+
   const result = await getNucleusDetail(nucleusId);
 
   if (!result.success || !result.data) {
@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: NucleusDetailPageProps): Prom
   }
 
   const nucleus = result.data;
-  
+
   return {
     title: `${nucleus.name} - Nucleus Detail`,
     description: `View the detailed information of ${nucleus.name}, including manager, capacity, energy, and other core data.`,
@@ -42,14 +42,14 @@ export async function generateMetadata({ params }: NucleusDetailPageProps): Prom
 
 export default async function NucleusDetailPage({ params }: NucleusDetailPageProps) {
   const { nucleusId } = await params;
-  
+
   const result = await getNucleusDetail(nucleusId);
 
   if (!result.success || !result.data) {
     if (result.message?.includes("404") || result.message?.includes("not found")) {
       notFound();
     }
-    
+
     return (
       <div className="w-full mx-auto py-4">
         <div className="mb-6">
@@ -59,7 +59,7 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
             </Button>
           </Link>
         </div>
-        
+
         <Card>
           <CardBody>
             <p className="text-danger">Load data failed: {result.message || "Unknown error"}</p>
@@ -73,26 +73,19 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
 
   return (
     <div className="w-full mx-auto py-4 space-y-6">
-      <div className="mb-6">
+      <div className="flex justify-between items-center mb-6">
         <Link href="/">
           <Button variant="ghost" startContent={<ArrowLeft size={16} />}>
             Back to Home
           </Button>
         </Link>
-      </div>
-
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Nucleus Detail</h1>
-        <p className="text-default-500">View the detailed information of {nucleus.name}</p>
+        <OpenLogs nucleusId={nucleusId} />
       </div>
 
       <NucleusCard nucleus={nucleus} showLink={false} />
 
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Detailed Information</h2>
-          <OpenLogs nucleusId={nucleusId} />
-        </div>
+        <h2 className="text-xl font-semibold">Detailed Information</h2>
         <Card>
           <CardBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -101,19 +94,19 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
                   <h3 className="text-sm font-medium text-default-500 mb-1">Root State</h3>
                   <p className="text-sm font-mono break-all">{nucleus.rootState}</p>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">ID</h3>
                   <p className="text-sm font-mono break-all">{nucleus.id}</p>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">WASM Hash</h3>
                   <p className="text-sm font-mono break-all">{nucleus.wasmHash}</p>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">Manager</h3>
                   <p className="text-sm font-mono break-all">{nucleus.manager}</p>
