@@ -1,7 +1,12 @@
 "use client";
 
-import React, { Key, useEffect, useMemo } from "react";
-import { Button, User, DropdownTrigger, DropdownMenu, DropdownItem, Dropdown } from "@heroui/react";
+import { Key, useEffect, useMemo } from "react";
+import { Button } from "@heroui/button";
+import { User } from "@heroui/user";
+import { DropdownTrigger } from "@heroui/dropdown";
+import { DropdownMenu } from "@heroui/dropdown";
+import { DropdownItem } from "@heroui/dropdown";
+import { Dropdown } from "@heroui/dropdown";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { Wallet } from "lucide-react";
 import { toast } from "react-toastify";

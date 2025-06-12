@@ -96,8 +96,8 @@ const testData = {
             "tokenUrl": "https://example.com/oauth/token",
             "refreshUrl": "https://example.com/oauth/refresh",
             "scopesArray": [
-              {"name": "read", "description": "read permission"},
-              {"name": "write", "description": "write permission"}
+              { "name": "read", "description": "read permission" },
+              { "name": "write", "description": "write permission" }
             ]
           }
         }
@@ -136,6 +136,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   onSubmit,
   isLoading = false,
 }) => {
+  const [isOpenJsonImport, setIsOpenJsonImport] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState('');
 
@@ -229,7 +230,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
           Object.entries(scheme.flows).forEach(([flowType, flowConfig]: [string, any]) => {
             if (flowConfig && typeof flowConfig === 'object') {
               const processedFlow = { ...flowConfig };
-              
+
               if (flowConfig.scopesArray && Array.isArray(flowConfig.scopesArray)) {
                 const scopes: { [name: string]: string } = {};
                 flowConfig.scopesArray.forEach(({ name, description }: any) => {
@@ -240,7 +241,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                 processedFlow.scopes = scopes;
                 delete processedFlow.scopesArray;
               }
-              
+
               processedFlows[flowType] = processedFlow;
             }
           });
@@ -294,11 +295,11 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
             // Convert scopes object to array for OAuth2
             if (parsedScheme.type === 'oauth2' && parsedScheme.flows) {
               const processedFlows: any = {};
-              
+
               Object.entries(parsedScheme.flows).forEach(([flowType, flowConfig]: [string, any]) => {
                 if (flowConfig && typeof flowConfig === 'object') {
                   const processedFlow = { ...flowConfig };
-                  
+
                   if (flowConfig.scopes && typeof flowConfig.scopes === 'object') {
                     const scopesArray = Object.entries(flowConfig.scopes).map(([name, description]) => ({
                       name,
@@ -306,7 +307,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     }));
                     processedFlow.scopesArray = scopesArray;
                   }
-                  
+
                   processedFlows[flowType] = processedFlow;
                 }
               });
@@ -377,58 +378,69 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   };
 
   return (
-    <div className="mx-auto pt-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <FileText size={20} />
-            JSON Import
-          </h3>
-        </CardHeader>
-        <CardBody>
-          <div className="space-y-4">
+    <div className="mx-auto space-y-6">
+      <div className="flex justify-end">
+        <Button
+          color="primary"
+          variant="flat"
+          onPress={() => setIsOpenJsonImport(!isOpenJsonImport)}
+        >
+          Toggle JSON Import
+        </Button>
+      </div>
+      {isOpenJsonImport && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <FileText size={20} />
+              JSON Import
+            </h3>
+          </CardHeader>
+          <CardBody>
+            <div className="space-y-4">
 
-            <Textarea
-              placeholder="Paste your AgentCard JSON here..."
-              value={jsonInput}
-              onChange={(e) => setJsonInput(e.target.value)}
-              minRows={6}
-              isInvalid={!!jsonError}
-              errorMessage={jsonError}
-              description="Support complete AgentCard JSON format data"
-            />
+              <Textarea
+                placeholder="Paste your AgentCard JSON here..."
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+                minRows={6}
+                isInvalid={!!jsonError}
+                errorMessage={jsonError}
+                description="Support complete AgentCard JSON format data"
+              />
 
-            <div className="flex gap-2">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={() => parseJsonData()}
-                disabled={!jsonInput.trim() && !isLoading}
-              >
-                Parse
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onPress={() => parseJsonData()}
+                  disabled={!jsonInput.trim() && !isLoading}
+                >
+                  Parse
+                </Button>
 
-              <Button
-                color="warning"
-                variant="flat"
-                onPress={clearForm}
-              >
-                Clear Form
-              </Button>
-
-              {process.env.NODE_ENV === 'development' && (
                 <Button
                   color="warning"
                   variant="flat"
-                  onPress={parseTestData}
+                  onPress={clearForm}
                 >
-                  Parse Test Data
+                  Clear Form
                 </Button>
-              )}
+
+                {process.env.NODE_ENV === 'development' && (
+                  <Button
+                    color="warning"
+                    variant="flat"
+                    onPress={parseTestData}
+                  >
+                    Parse Test Data
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </CardBody>
-      </Card>
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <CardBody>

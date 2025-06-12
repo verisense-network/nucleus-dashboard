@@ -19,10 +19,10 @@ export default async function Home() {
         <NodeDetail />
       </div>
       <div className="w-full">
-        <NucleusList />
+        <AgentList />
       </div>
       <div className="w-full">
-        <AgentList />
+        <NucleusList />
       </div>
     </div>
   );
