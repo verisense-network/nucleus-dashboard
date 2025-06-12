@@ -134,7 +134,7 @@ export const ScopesInput = ({
             ))}
 
             {(!field.value || field.value.length === 0) && (
-              <div className="text-center text-gray-500 py-4 border-2 border-dashed border-gray-200 rounded-lg">
+              <div className="text-center text-gray-500 py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
                 <p className="text-sm">No scopes defined</p>
                 <p className="text-xs">Click &quot;Add Scope&quot; to add OAuth2 scopes</p>
               </div>

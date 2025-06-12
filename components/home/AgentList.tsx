@@ -29,7 +29,7 @@ export default async function AgentList() {
     <>
       <div className="flex justify-between items-center">
         <h2 className="text-lg mb-4">Agents</h2>
-        <Button size="sm" variant="flat" color="primary">
+        <Button size="sm" color="primary">
           <Link href="/register/agent">Register Agent</Link>
         </Button>
       </div>

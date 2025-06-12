@@ -3,6 +3,8 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { WalletStatus } from "@/components/connectWallet";
+import Logo from "./icon/Logo";
+import { Divider } from "@heroui/react";
 
 export default function Header() {
   const router = useRouter();
@@ -14,8 +16,10 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 w-full h-16 border-b bg-white border-zinc-200 dark:bg-black dark:border-zinc-800 z-50">
       <div className="max-w-7xl mx-auto h-full px-4 flex items-center justify-between">
-        <div className="flex-shrink-0 cursor-pointer" onClick={toHomePage}>
-          Dashboard
+        <div className="flex-shrink-0 cursor-pointer flex items-center gap-2" onClick={toHomePage}>
+          <Logo />
+          <Divider orientation="vertical" className="h-6 text-foreground" />
+          <span className="text-base font-bold">Dashboard</span>
         </div>
         <div className="max-w-xl w-full mx-4">
         </div>

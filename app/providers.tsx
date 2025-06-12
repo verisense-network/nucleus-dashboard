@@ -11,7 +11,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   return (
     <HeroUIProvider navigate={router.push}>
-      <NextThemesProvider attribute="class" defaultTheme="light">
+      <NextThemesProvider attribute="class" defaultTheme="dark">
         <ToastContainer autoClose={3500} toastClassName="mt-1 max-w-[98vw]" />
         <SWRConfig
           value={{

@@ -1142,7 +1142,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       size="lg"
                       color="primary"
                       classNames={{
-                        base: "inline-flex flex-row-reverse w-full max-w-full bg-content1 hover:bg-content2 items-center justify-between cursor-pointer rounded-lg gap-2 p-4 border-2 border-gray-200 data-[selected=true]:border-primary",
+                        base: "inline-flex flex-row-reverse w-full max-w-full bg-content1 hover:bg-content2 items-center justify-between cursor-pointer rounded-lg gap-2 p-4 border-2 border-zinc-200 dark:border-zinc-800 data-[selected=true]:border-primary",
                         wrapper: "p-0 h-4 overflow-visible",
                         thumb: "w-6 h-6 border-2 border-white shadow-lg group-data-[hover=true]:border-primary group-data-[selected=true]:ml-8 group-data-[selected=true]:border-primary rtl:group-data-[selected=true]:ml-0 rtl:group-data-[selected=true]:mr-8"
                       }}
