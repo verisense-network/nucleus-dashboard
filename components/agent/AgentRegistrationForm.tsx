@@ -9,6 +9,7 @@ import { Checkbox, Switch } from '@heroui/react';
 import { Divider } from '@heroui/react';
 import { Plus, Trash2, FileText } from 'lucide-react';
 import { AgentCard, SecurityScheme } from '@/types/a2a';
+import { TagsInput } from '../input/TagsInput';
 
 // Helper type for form data to handle securitySchemes as an array
 interface SecuritySchemeFormData {
@@ -866,20 +867,11 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       }}
                     />
 
-                    <Controller
+                    <TagsInput
                       name={`securityArray.${index}.scopes`}
                       control={control}
-                      render={({ field }) => (
-                        <Textarea
-                          label="Scopes"
-                          placeholder="Enter scopes separated by commas (e.g., read, write, admin)"
-                          value={Array.isArray(field.value) ? field.value.join(', ') : ''}
-                          onChange={(e) => {
-                            const scopes = e.target.value.split(',').map(scope => scope.trim()).filter(Boolean);
-                            field.onChange(scopes);
-                          }}
-                        />
-                      )}
+                      label="Scopes"
+                      placeholder="Enter scopes (e.g., read, write, admin)"
                     />
                   </div>
                 </Card>
@@ -1088,20 +1080,11 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       )}
                     />
 
-                    <Controller
+                    <TagsInput
                       name={`skills.${index}.tags`}
                       control={control}
-                      render={({ field }) => (
-                        <Input
-                          label="Tags"
-                          placeholder="cooking,customer-support,billing (use comma to separate)"
-                          value={Array.isArray(field.value) ? field.value.join(', ') : ''}
-                          onChange={(e) => {
-                            const tags = e.target.value.split(',').map(tag => tag.trim()).filter(Boolean);
-                            field.onChange(tags);
-                          }}
-                        />
-                      )}
+                      label="Tags"
+                      placeholder="Enter tags (e.g., cooking, customer-support, billing)"
                     />
 
                     <Controller
