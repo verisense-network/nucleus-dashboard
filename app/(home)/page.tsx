@@ -3,7 +3,7 @@ import AgentList from "@/components/home/AgentList";
 import NodeDetail from "@/components/home/NodeDetail";
 import { MetaData } from "@/config/website";
 
-export const revalidate = 3600;
+export const revalidate = false;
 
 export async function generateMetadata() {
   return {
