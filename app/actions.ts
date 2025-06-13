@@ -7,6 +7,13 @@ import { NodeDetail } from "@/types/node";
 import { AgentCard } from "@/types/a2a";
 import { APIResponse } from "@/types/api";
 import { getAgentByIdAPI, getAgentListAPI } from "@/api/rpc";
+import { revalidatePath } from "next/cache";
+
+
+export async function invalidateCache(path: string) {
+  revalidatePath(path);
+  return { success: true };
+}
 
 export async function getNucleusList(): Promise<NucleusListResponse> {
   try {

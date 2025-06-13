@@ -6,6 +6,7 @@ import { AgentCard } from "@/types/a2a";
 import { Id, toast } from "react-toastify";
 import { agentRegister } from "@/api/rpc";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
+import { invalidateCache } from "@/app/actions";
 
 export default function AgentRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +33,8 @@ export default function AgentRegistrationPage() {
         autoClose: 3500,
       });
       console.log('Transaction finalized with hash:', finalizedHash);
+
+      invalidateCache('/');
     } catch (error) {
       console.error('Registration failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed, please try again';
