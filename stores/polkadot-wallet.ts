@@ -1,4 +1,5 @@
 import { getPolkadotApi } from "@/lib/polkadotApi";
+import { toast } from "react-toastify";
 import { create } from "zustand";
 import { createComputed } from "zustand-computed";
 import { persist, createJSONStorage } from "zustand/middleware";
@@ -64,7 +65,9 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
           const extensions = await web3Enable("Nucleus Dashboard");
           
           if (extensions.length === 0) {
-            throw new Error("not found Polkadot wallet extension, please install SubWallet");
+            const msg = "Not found Polkadot wallet extension, please install SubWallet"
+            toast.info(msg)
+            throw new Error(msg);
           }
 
           const subWallet = extensions.find((ext: any) => 
