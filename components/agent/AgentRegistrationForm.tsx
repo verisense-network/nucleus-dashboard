@@ -11,7 +11,7 @@ import { Plus, Trash2, FileText } from 'lucide-react';
 import { AgentCard, SecurityScheme } from '@/types/a2a';
 import { TagsInput } from '../input/TagsInput';
 import { OAuth2FlowsInput } from '../input/OAuth2FlowsInput';
-import { Id, toast } from 'react-toastify';
+import { KeyValueInput } from '../input/KeyValueInput';
 
 
 interface SecuritySchemeFormData {
@@ -32,7 +32,7 @@ interface FormData extends Omit<AgentCard, 'securitySchemes' | 'security'> {
 }
 
 interface AgentRegistrationFormProps {
-  onSubmit: (data: AgentCard, toastId: Id) => Promise<void>;
+  onSubmit: (data: AgentCard) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -44,91 +44,60 @@ const testData = {
   "version": "1.0.0",
   "documentationUrl": "https://x.com/veri_sense",
   "capabilities": {
-    "streaming": true,
-    "pushNotifications": true,
-    "stateTransitionHistory": false,
-    "extensions": []
+      "streaming": true,
+      "pushNotifications": true,
+      "stateTransitionHistory": false,
+      "extensions": [
+          {
+              "uri": "https://x.com/veri_sense",
+              "description": "assadafsasdf",
+              "required": false,
+              "params": "{\"asdfasfdsaf\":\"1\",\"b\":\"2\"}"
+          }
+      ]
   },
   "defaultInputModes": [
-    "text/plain"
+      "text/plain"
   ],
   "defaultOutputModes": [
-    "text/plain"
+      "text/plain"
   ],
   "skills": [
-    {
-      "id": "skill1",
-      "name": "sdasafasfd",
-      "description": "afsdasfdsfadfsdaasdfasfd",
-      "tags": [
-        "adfasdf"
-      ],
-      "examples": [
-        "ddddddd"
-      ],
-      "inputModes": [],
-      "outputModes": []
-    }
+      {
+          "id": "skill1",
+          "name": "sdasafasfd",
+          "description": "afsdasfdsfadfsdaasdfasfd",
+          "tags": [
+              "adfasdf"
+          ],
+          "examples": [
+              "ddddddd"
+          ],
+          "inputModes": [],
+          "outputModes": []
+      }
   ],
   "supportsAuthenticatedExtendedCard": true,
   "provider": {
-    "organization": "Verisense",
-    "url": "https://x.com/veri_sense"
+      "organization": "Verisense",
+      "url": "https://x.com/veri_sense"
   },
-  "securitySchemesArray": [
-    {
-      "schemeName": "api_key",
-      "scheme": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-API-Key",
-        "description": "afsafdsfdasafdsfadasfd"
-      }
-    },
-    {
-      "schemeName": "oauth2_standard",
-      "scheme": {
-        "type": "oauth2",
-        "description": "OAuth2 Standard",
-        "flows": {
-          "authorizationCode": {
-            "authorizationUrl": "https://example.com/oauth/authorize",
-            "tokenUrl": "https://example.com/oauth/token",
-            "refreshUrl": "https://example.com/oauth/refresh",
-            "scopesArray": [
-              { "name": "read", "description": "read permission" },
-              { "name": "write", "description": "write permission" }
-            ]
-          }
-        }
-      }
-    }
-  ],
-  "securityArray": [
-    {
-      "schemeName": "api_key",
-      "scopes": []
-    },
-    {
-      "schemeName": "oauth2_standard",
-      "scopes": [
-        "read", "write"
-      ]
-    }
-  ],
   "securitySchemes": {
-    "api_key": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"X-API-Key\",\"description\":\"API Key Authentication\"}",
-    "oauth2_standard": "{\"type\":\"oauth2\",\"description\":\"OAuth2 Standard\",\"flows\":{\"authorizationCode\":{\"authorizationUrl\":\"https://example.com/oauth/authorize\",\"tokenUrl\":\"https://example.com/oauth/token\",\"refreshUrl\":\"https://example.com/oauth/refresh\",\"scopes\":{\"read\":\"read permission\",\"write\":\"write permission\"}}}}"
+      "api_key": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"X-API-Key\",\"description\":\"API Key Authentication\"}",
+      "oauth2_standard": "{\"type\":\"oauth2\",\"description\":\"OAuth2 Standard\",\"flows\":{\"authorizationCode\":{\"authorizationUrl\":\"https://example.com/oauth/authorize\",\"tokenUrl\":\"https://example.com/oauth/token\",\"refreshUrl\":\"https://example.com/oauth/refresh\",\"scopes\":{\"read\":\"read permission\",\"write\":\"write permission\"}}}}"
   },
   "security": [
-    {
-      "api_key": ["read"]
-    },
-    {
-      "oauth2_standard": [
-        "read", "write"
-      ]
-    }
+      {
+          "api_key": [
+              "read"
+          ]
+      },
+      {
+          "oauth2_standard": [
+              "read",
+              "write"
+          ]
+      }
   ]
 }
 
@@ -203,6 +172,15 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     name: 'securityArray',
   });
 
+  const {
+    fields: extensionFields,
+    append: appendExtension,
+    remove: removeExtension,
+  } = useFieldArray({
+    control,
+    name: 'capabilities.extensions',
+  });
+
   const mediaTypes = [
     'text/plain',
     'text/markdown',
@@ -217,7 +195,6 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   ];
 
   const handleFormSubmit = async (data: FormData) => {
-    const toastId = toast.loading('Continue in your wallet...');
     // Convert securitySchemesArray back to securitySchemes object
     const securitySchemes: { [scheme: string]: SecurityScheme } = {};
     data.securitySchemesArray?.forEach(({ schemeName, scheme }) => {
@@ -264,6 +241,12 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       }
     });
 
+    // Process extensions params
+    const processedExtensions = data.capabilities.extensions?.map(extension => ({
+      ...extension,
+      params: extension.params || undefined
+    }));
+
     const agentCardData: AgentCard = {
       ...data,
       securitySchemes: Object.keys(securitySchemes).length > 0 ? securitySchemes : undefined,
@@ -271,9 +254,13 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       iconUrl: data.iconUrl || undefined,
       documentationUrl: data.documentationUrl || undefined,
       provider: data.provider?.organization ? data.provider : undefined,
+      capabilities: {
+        ...data.capabilities,
+        extensions: processedExtensions
+      }
     };
 
-    await onSubmit(agentCardData, toastId);
+    await onSubmit(agentCardData);
     reset();
   };
 
@@ -335,6 +322,13 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
             }))
           )
           : [],
+        capabilities: {
+          ...parsedData.capabilities,
+          extensions: parsedData.capabilities?.extensions?.map((extension: any) => ({
+            ...extension,
+            params: typeof extension.params === 'string' ? JSON.parse(extension.params) : extension.params
+          }))
+        }
       };
 
       reset(formData);
@@ -962,6 +956,112 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     </Checkbox>
                   )}
                 />
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Extensions</h4>
+                  <Button
+                    type="button"
+                    size="sm"
+                    color="primary"
+                    variant="flat"
+                    startContent={<Plus size={16} />}
+                    onPress={() => {
+                      appendExtension({
+                        uri: '',
+                        description: '',
+                        required: false,
+                        params: {}
+                      });
+                    }}
+                  >
+                    Add Extension
+                  </Button>
+                </div>
+
+                {extensionFields.map((field, index) => (
+                  <Card key={field.id} className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Extension {index + 1}</h4>
+                        <Button
+                          type="button"
+                          size="sm"
+                          color="danger"
+                          variant="flat"
+                          isIconOnly
+                          onPress={() => removeExtension(index)}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+
+                      <Controller
+                        name={`capabilities.extensions.${index}.uri`}
+                        control={control}
+                        rules={{ required: 'Extension URI is required' }}
+                        render={({ field }) => (
+                          <Input
+                            {...field}
+                            label="Extension URI"
+                            placeholder="https://example.com/extension"
+                            isInvalid={!!errors.capabilities?.extensions?.[index]?.uri}
+                            errorMessage={errors.capabilities?.extensions?.[index]?.uri?.message}
+                            isRequired
+                          />
+                        )}
+                      />
+
+                      <Controller
+                        name={`capabilities.extensions.${index}.description`}
+                        control={control}
+                        render={({ field }) => (
+                          <Textarea
+                            {...field}
+                            label="Description"
+                            placeholder="Describe how this agent uses this extension"
+                          />
+                        )}
+                      />
+
+                      <Controller
+                        name={`capabilities.extensions.${index}.required`}
+                        control={control}
+                        render={({ field }) => (
+                          <Checkbox
+                            isSelected={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            Required
+                          </Checkbox>
+                        )}
+                      />
+
+                      <Controller
+                        name={`capabilities.extensions.${index}.params`}
+                        control={control}
+                        render={({ field }) => (
+                          <KeyValueInput
+                            name={`capabilities.extensions.${index}.params`}
+                            control={control}
+                            label="Parameters"
+                            placeholder={{
+                              key: "Parameter name",
+                              value: "Parameter value"
+                            }}
+                          />
+                        )}
+                      />
+                    </div>
+                  </Card>
+                ))}
+
+                {extensionFields.length === 0 && (
+                  <div className="text-center text-gray-500 py-4">
+                    <p>No extensions configured.</p>
+                  </div>
+                )}
               </div>
             </div>
 

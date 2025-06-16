@@ -3,7 +3,9 @@ import AgentList from "@/components/home/AgentList";
 import NodeDetail from "@/components/home/NodeDetail";
 import { MetaData } from "@/config/website";
 
-export const revalidate = false;
+export const dynamic = 'force-dynamic';
+
+export const revalidate = 0;
 
 export async function generateMetadata() {
   return {

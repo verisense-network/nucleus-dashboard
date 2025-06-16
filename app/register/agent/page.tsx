@@ -11,15 +11,20 @@ import { invalidateCache } from "@/app/actions";
 export default function AgentRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (data: AgentCard, toastId: Id) => {
+  const handleSubmit = async (data: AgentCard) => {
     setIsLoading(true);
+    const toastId = toast.loading('Continue in your wallet...');
     console.log('data', data);
     try {
       const { isConnected, selectedAccount } = usePolkadotWalletStore.getState();
-      
+
       if (!isConnected || !selectedAccount) {
-        toast.error('please connect wallet and select account', {
-          toastId: toastId,
+        console.error('not connected');
+        toast.update(toastId, {
+          type: 'error',
+          render: 'please connect wallet and select account',
+          isLoading: false,
+          autoClose: 3500,
         });
         return;
       }

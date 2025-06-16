@@ -55,6 +55,7 @@ export function WalletStatus() {
   };
 
   const handleAction = (key: Key) => {
+    updateBalance();
     if (key === "copy-address") {
       copyAddress(selectedAccount.address);
     } else if (key === "disconnect") {

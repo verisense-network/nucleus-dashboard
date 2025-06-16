@@ -4,11 +4,12 @@ import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { Divider } from "@heroui/divider";
 import { Avatar } from "@heroui/avatar";
-import { ArrowLeft, Shield, Zap, FileText, ExternalLink, Key, Lock } from "lucide-react";
+import { ArrowLeft, Shield, Zap, FileText, ExternalLink, Key, Lock, CircleHelp } from "lucide-react";
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SecurityScheme, OAuth2SecurityScheme, APIKeySecurityScheme, HTTPAuthSecurityScheme, OpenIdConnectSecurityScheme } from "../../../types/a2a";
+import { Tooltip } from "@heroui/tooltip";
 
 interface AgentDetailPageProps {
   params: Promise<{
@@ -47,7 +48,7 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
   const result = await getAgentById(agentId);
 
   if (!result.success || !result.data) {
-    if (result.message?.includes("404") || result.message?.includes("not found")) {
+    if (!result.data && !result.message) {
       notFound();
     }
 
@@ -315,6 +316,74 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
               </Chip>
             </div>
           </div>
+
+          {agentCard.capabilities.extensions && agentCard.capabilities.extensions.length > 0 && (
+            <div className="mt-6">
+              <h4 className="font-medium mb-3">Extensions</h4>
+              <div className="space-y-4">
+                {agentCard.capabilities.extensions.map((extension, index) => (
+                  <div key={index} className="bg-default-50 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Link href={extension.uri} target="_blank" className="text-primary text-small flex items-center gap-1">
+                            {extension.uri} <ExternalLink size={12} />
+                          </Link>
+                          <div className="flex items-center gap-1 ml-4">
+                            <Chip
+                              variant="flat"
+                              color={extension.required ? "warning" : "default"}
+                              size="sm"
+                            >
+                              {extension.required ? "Required" : "Optional"}
+                            </Chip>
+                            <Tooltip content="Whether the client must follow specific requirements of the extension.">
+                              <CircleHelp size={18} className="text-default-500" />
+                            </Tooltip>
+                          </div>
+                        </div>
+                        {extension.description && (
+                          <p className="text-small text-default-600">{extension.description}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {extension.params && (
+                      <div>
+                        <h5 className="font-medium mb-2">Parameters</h5>
+                        <div className="bg-default-100 rounded-lg p-3">
+                          {(() => {
+                            const params = typeof extension.params === 'string'
+                              ? JSON.parse(extension.params)
+                              : extension.params;
+
+                            return (
+                              <div className="space-y-2">
+                                {Object.entries(params).map(([key, value]) => (
+                                  <div key={key} className="flex items-start gap-2">
+                                    <div className="min-w-[120px]">
+                                      <Chip variant="flat" color="primary" size="sm" className="w-full justify-center">
+                                        {key}
+                                      </Chip>
+                                    </div>
+                                    <div className="flex-1">
+                                      <Chip variant="flat" color="secondary" size="sm" className="w-full">
+                                        {String(value)}
+                                      </Chip>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardBody>
       </Card>
 

@@ -73,6 +73,6 @@ export async function getAgentListAPI(): Promise<AgentCard[]> {
 
 export async function getAgentByIdAPI(agentId: string): Promise<AgentCard> {
   const api = await getPolkadotApi();
-  const result = await api.call.a2aRuntimeApi.findAgent(agentId);
+  const result = await api.call.a2aRuntimeApi?.findAgent(agentId);
   return result.toHuman() as unknown as AgentCard;
 }
