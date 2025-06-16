@@ -244,7 +244,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     // Process extensions params
     const processedExtensions = data.capabilities.extensions?.map(extension => ({
       ...extension,
-      params: extension.params || undefined
+      params: extension.params ? JSON.stringify(extension.params) : "{}"
     }));
 
     const agentCardData: AgentCard = {
@@ -256,7 +256,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       provider: data.provider?.organization ? data.provider : undefined,
       capabilities: {
         ...data.capabilities,
-        extensions: processedExtensions
+        extensions: processedExtensions as any
       }
     };
 
