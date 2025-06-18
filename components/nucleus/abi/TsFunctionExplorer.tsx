@@ -2996,7 +2996,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
                     {(!codecClass.fields || codecClass.fields.length === 0) &&
                       (!codecClass.variants || codecClass.variants.length === 0) &&
                       codecClass.definition && (
-                        <pre className="font-mono text-sm bg-gray-100 p-2 rounded">
+                        <pre className="font-mono text-sm bg-gray-100 dark:bg-zinc-800 p-2 rounded">
                           {codecClass.definition}
                         </pre>
                       )}
