@@ -5,6 +5,7 @@ import { Tabs, Tab, Card, CardBody, Spinner, Button } from "@heroui/react";
 import { NucleusInfo } from "@/types/nucleus";
 import { getNucleusAbi } from "@/app/actions";
 import TsFunctionExplorer from "./TsFunctionExplorer";
+import CodeBlock from "@/components/CodeBlock";
 import { transform } from 'sucrase';
 import { generateCode } from "./generator";
 import * as codecTypes from '@polkadot/types-codec';
@@ -620,16 +621,20 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
           </Tab>
           <Tab key="ts" title="TS Code">
             <div className="py-4">
-              <pre className="bg-default-100 p-4 rounded-lg overflow-auto text-xs">
-                {tsCode}
-              </pre>
+              <CodeBlock
+                code={tsCode}
+                language="typescript"
+                title="TypeScript Code"
+              />
             </div>
           </Tab>
           <Tab key="raw" title="Raw">
             <div className="py-4">
-              <pre className="bg-default-100 p-4 rounded-lg overflow-auto text-xs">
-                {JSON.stringify(abiData, null, 2)}
-              </pre>
+              <CodeBlock
+                code={JSON.stringify(abiData, null, 2)}
+                language="json"
+                title="Raw ABI Data"
+              />
             </div>
           </Tab>
         </Tabs>
