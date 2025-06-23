@@ -104,17 +104,6 @@ function convertPolkadotClassType(type: TypeDefinition): string {
       const typeName = type.path[type.path.length - 1];
       
       switch (typeName) {
-        case "u8": return "u8";
-        case "u16": return "u16";
-        case "u32": return "U32";
-        case "u64": return "U64";
-        case "u128": return "U128";
-        case "i8": return "i8";
-        case "i16": return "i16";
-        case "i32": return "I32";
-        case "i64": return "I64";
-        case "i128": return "I128";
-        case "bool": return "bool";
         case "String": return "Text";
         case "Vec":
           if (type.generic_args && type.generic_args.length > 0) {
@@ -160,63 +149,6 @@ function convertPolkadotClassType(type: TypeDefinition): string {
       
     default:
       return "Codec";
-  }
-}
-
-function convertPolkadotType(type: TypeDefinition): string {
-  switch (type.kind) {
-    case "Path":
-      if (!type.path || type.path.length === 0) {
-        return "unknown";
-      }
-      
-      const typeName = type.path[type.path.length - 1];
-      
-      switch (typeName) {
-        case "u8": return "u8";
-        case "u16": return "u16";
-        case "u32": return "U32";
-        case "u64": return "U64";
-        case "u128": return "U128";
-        case "i8": return "i8";
-        case "i16": return "i16";
-        case "i32": return "I32";
-        case "i64": return "I64";
-        case "i128": return "I128";
-        case "bool": return "bool";
-        case "String": return "Text";
-        case "H160": return "U8aFixed.with(160 as U8aBitLength)";
-        case "Vec":
-          if (type.generic_args && type.generic_args.length > 0) {
-            return `Vec.with(${convertPolkadotType(type.generic_args[0]!)})`;
-          }
-          return "Vec";
-        case "Option":
-          if (type.generic_args && type.generic_args.length > 0) {
-            return `Option.with(${convertPolkadotType(type.generic_args[0]!)})`;
-          }
-          return "Option";
-        case "Result":
-          if (type.generic_args && type.generic_args.length === 2) {
-            return `Result.with({\n    Ok: ${convertPolkadotType(type.generic_args[0]!)},\n    Err: ${convertPolkadotType(type.generic_args[1]!)}\n  })`;
-          }
-          return "Result";
-        default:
-          if (typeName === "T" || typeName === "S") {
-            return typeName;
-          }
-          return typeName || "Codec";
-      }
-      
-    case "Tuple":
-      if (!type.tuple_args || type.tuple_args.length === 0) {
-        return "Null";
-      }
-      const tupleTypes = type.tuple_args.map(t => convertPolkadotType(t)).join(', ');
-      return `Tuple.with([${tupleTypes}])`;
-      
-    default:
-      return "unknown";
   }
 }
 
@@ -317,17 +249,6 @@ function generateReturnType(type: TypeDefinition): string {
       const typeName = type.path[type.path.length - 1];
       
       switch (typeName) {
-        case "u8": return "u8";
-        case "u16": return "u16";
-        case "u32": return "U32";
-        case "u64": return "U64";
-        case "u128": return "U128";
-        case "i8": return "i8";
-        case "i16": return "i16";
-        case "i32": return "I32";
-        case "i64": return "I64";
-        case "i128": return "I128";
-        case "bool": return "bool";
         case "String": return "Text";
         case "H160": return "U8aFixed";
         case "Vec":

@@ -2431,16 +2431,28 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
         <Input
           size="sm"
           placeholder={getPlaceholder(field.type)}
-          value={field.value || ''}
+          value={field.value}
           onChange={(e) => handleValueUpdate(`${fieldPath}.value`, e.target.value)}
         />
         <Chip size="sm" variant="flat">{field.type}</Chip>
         {field.isOption && (
           <Chip size="sm" variant="flat" color="warning">Optional</Chip>
         )}
+        {field.name === 'nucleusId' && (
+          <Button
+            size="sm"
+            variant="flat"
+            color="primary"
+            onPress={() => {
+              handleValueUpdate(`${fieldPath}.value`, nucleusId);
+            }}
+          >
+            Set Default
+          </Button>
+        )}
       </div>
     );
-  }, [updateDebugValue, updateFunctionInput, addVecItemForNestedField, removeVecItemForNestedField, getPlaceholder]);
+  }, [getPlaceholder, updateFunctionInput, updateDebugValue, addVecItemForNestedField, removeVecItemForNestedField, nucleusId]);
 
   const renderDebugInterface = useCallback((codecClass: ExtractedClass, classIndex: number) => {
     if (!codecClass.debugMode) return null;
