@@ -14,6 +14,7 @@ import { Registry } from "@polkadot/types/types";
 import { HttpProvider, WsProvider } from "@polkadot/rpc-provider";
 import { ApiPromise } from "@polkadot/api";
 import { ENDPOINT } from "@/config/endpoint";
+import { u8aToHex } from "@polkadot/util";
 
 interface AbiDetailsProps {
   nucleus: NucleusInfo;
@@ -522,6 +523,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
   }, []);
 
   const defineCodecTypesToWindow = useCallback((tsCode: string) => {
+    (window as any).u8aToHex = u8aToHex;
     (window as any).codecTypes = codecTypes;
     const registry = new TypeRegistry() as unknown as Registry;
     (window as any).registry = registry;

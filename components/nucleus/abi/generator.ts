@@ -56,6 +56,7 @@ import {
   ${Array.from(imports).join(',\n  ')}
 } from '@polkadot/types-codec';
 import { ApiPromise, HttpProvider } from "@polkadot/api";
+import { u8aToHex } from '@polkadot/util';
 import { TypeRegistry } from '@polkadot/types';
 import type { Registry, Codec } from '@polkadot/types/types';
 import type { U8aBitLength } from '@polkadot/types-codec/types';
@@ -186,7 +187,7 @@ ${returnTypeProcessing}
     
     paramProcessing.push(`  const ${varName} = ${constructorCall};`);
     
-    const rpcParams = ['nucleusId', `'${func.name}'`, `${input.name}?.toHex()`];
+    const rpcParams = ['nucleusId', `'${func.name}'`, `u8aToHex(${input.name}?.toU8a())`];
     
     let returnTypeProcessing = '';
     if (func.output) {
@@ -217,7 +218,7 @@ ${returnTypeProcessing}
     
     paramProcessing.push(`  const args = ${tupleConstructorCall};`);
     
-    const rpcParams = ['nucleusId', `'${func.name}'`, 'args?.toHex()'];
+    const rpcParams = ['nucleusId', `'${func.name}'`, `u8aToHex(args?.toU8a())`];
     
     let returnTypeProcessing = '';
     if (func.output) {
