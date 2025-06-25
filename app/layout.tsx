@@ -3,6 +3,7 @@ import { Montserrat } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 import Header from "@/components/Header";
+import { MetaData } from "@/config/website";
 
 const montserrat = Montserrat({
   subsets: ["vietnamese"],
@@ -10,8 +11,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "A Dashboard for Nucleus",
+  title: MetaData.title,
+  description: MetaData.description,
 };
 
 export default function RootLayout({

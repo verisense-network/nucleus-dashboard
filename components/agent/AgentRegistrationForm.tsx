@@ -12,6 +12,7 @@ import { AgentCard, SecurityScheme } from '@/types/a2a';
 import { TagsInput } from '../input/TagsInput';
 import { OAuth2FlowsInput } from '../input/OAuth2FlowsInput';
 import { KeyValueInput } from '../input/KeyValueInput';
+import Link from 'next/link';
 
 
 interface SecuritySchemeFormData {
@@ -44,60 +45,60 @@ const testData = {
   "version": "1.0.0",
   "documentationUrl": "https://x.com/veri_sense",
   "capabilities": {
-      "streaming": true,
-      "pushNotifications": true,
-      "stateTransitionHistory": false,
-      "extensions": [
-          {
-              "uri": "https://x.com/veri_sense",
-              "description": "assadafsasdf",
-              "required": false,
-              "params": "{\"asdfasfdsaf\":\"1\",\"b\":\"2\"}"
-          }
-      ]
+    "streaming": true,
+    "pushNotifications": true,
+    "stateTransitionHistory": false,
+    "extensions": [
+      {
+        "uri": "https://x.com/veri_sense",
+        "description": "assadafsasdf",
+        "required": false,
+        "params": "{\"asdfasfdsaf\":\"1\",\"b\":\"2\"}"
+      }
+    ]
   },
   "defaultInputModes": [
-      "text/plain"
+    "text/plain"
   ],
   "defaultOutputModes": [
-      "text/plain"
+    "text/plain"
   ],
   "skills": [
-      {
-          "id": "skill1",
-          "name": "sdasafasfd",
-          "description": "afsdasfdsfadfsdaasdfasfd",
-          "tags": [
-              "adfasdf"
-          ],
-          "examples": [
-              "ddddddd"
-          ],
-          "inputModes": [],
-          "outputModes": []
-      }
+    {
+      "id": "skill1",
+      "name": "sdasafasfd",
+      "description": "afsdasfdsfadfsdaasdfasfd",
+      "tags": [
+        "adfasdf"
+      ],
+      "examples": [
+        "ddddddd"
+      ],
+      "inputModes": [],
+      "outputModes": []
+    }
   ],
   "supportsAuthenticatedExtendedCard": true,
   "provider": {
-      "organization": "Verisense",
-      "url": "https://x.com/veri_sense"
+    "organization": "Verisense",
+    "url": "https://x.com/veri_sense"
   },
   "securitySchemes": {
-      "api_key": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"X-API-Key\",\"description\":\"API Key Authentication\"}",
-      "oauth2_standard": "{\"type\":\"oauth2\",\"description\":\"OAuth2 Standard\",\"flows\":{\"authorizationCode\":{\"authorizationUrl\":\"https://example.com/oauth/authorize\",\"tokenUrl\":\"https://example.com/oauth/token\",\"refreshUrl\":\"https://example.com/oauth/refresh\",\"scopes\":{\"read\":\"read permission\",\"write\":\"write permission\"}}}}"
+    "api_key": "{\"type\":\"apiKey\",\"in\":\"header\",\"name\":\"X-API-Key\",\"description\":\"API Key Authentication\"}",
+    "oauth2_standard": "{\"type\":\"oauth2\",\"description\":\"OAuth2 Standard\",\"flows\":{\"authorizationCode\":{\"authorizationUrl\":\"https://example.com/oauth/authorize\",\"tokenUrl\":\"https://example.com/oauth/token\",\"refreshUrl\":\"https://example.com/oauth/refresh\",\"scopes\":{\"read\":\"read permission\",\"write\":\"write permission\"}}}}"
   },
   "security": [
-      {
-          "api_key": [
-              "read"
-          ]
-      },
-      {
-          "oauth2_standard": [
-              "read",
-              "write"
-          ]
-      }
+    {
+      "api_key": [
+        "read"
+      ]
+    },
+    {
+      "oauth2_standard": [
+        "read",
+        "write"
+      ]
+    }
   ]
 }
 
@@ -108,6 +109,8 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   const [isOpenJsonImport, setIsOpenJsonImport] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState('');
+  const [endpoint, setEndpoint] = useState('');
+  const [isLoadingAgentCard, setIsLoadingAgentCard] = useState(false);
 
   const {
     control,
@@ -182,6 +185,8 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   });
 
   const mediaTypes = [
+    'text',
+    'file',
     'text/plain',
     'text/markdown',
     'text/html',
@@ -371,15 +376,50 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     setJsonError('');
   };
 
+  const loadAgentCard = async () => {
+    if (!endpoint.trim()) {
+      setJsonError('Please enter a valid endpoint address');
+      return;
+    }
+
+    setIsLoadingAgentCard(true);
+    try {
+      setJsonError('');
+      const response = await fetch(`/api/proxy-agent-card?endpoint=${encodeURIComponent(endpoint)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      parseJsonData(JSON.stringify(data));
+    } catch (error) {
+      console.error('Error loading agent card:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setJsonError(`Failed to load: ${errorMessage}`);
+    } finally {
+      setIsLoadingAgentCard(false);
+    }
+  }
+
   return (
     <div className="mx-auto space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Link href="https://t.me/verisense_faucet_bot" target="_blank">
+          <Button
+            color="primary"
+            variant="flat"
+          >
+            Faucet
+          </Button>
+        </Link>
         <Button
           color="primary"
           variant="flat"
           onPress={() => setIsOpenJsonImport(!isOpenJsonImport)}
         >
-          Toggle JSON Import
+          Import
         </Button>
       </div>
       {isOpenJsonImport && (
@@ -387,13 +427,34 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
           <CardHeader>
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <FileText size={20} />
-              JSON Import
+              Import
             </h3>
           </CardHeader>
           <CardBody>
             <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Input
+                  label="From Endpoint"
+                  placeholder="Enter Agent server address (e.g. https://example.com)"
+                  value={endpoint}
+                  labelPlacement='outside'
+                  onChange={(e) => setEndpoint(e.target.value)}
+                  description="Enter the base URL of the Agent server, the system will automatically load /.well-known/agent.json"
+                />
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onPress={loadAgentCard}
+                  isLoading={isLoadingAgentCard}
+                  disabled={isLoadingAgentCard || !endpoint.trim()}
+                >
+                  {isLoadingAgentCard ? 'Loading...' : 'Load Agent Card'}
+                </Button>
+              </div>
 
               <Textarea
+                label="From AgentCard JSON"
+                labelPlacement='outside'
                 placeholder="Paste your AgentCard JSON here..."
                 value={jsonInput}
                 onChange={(e) => setJsonInput(e.target.value)}

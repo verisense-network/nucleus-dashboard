@@ -3,7 +3,7 @@
 import AgentRegistrationForm from "@/components/agent/AgentRegistrationForm";
 import { useState } from "react";
 import { AgentCard } from "@/types/a2a";
-import { Id, toast } from "react-toastify";
+import { toast } from "react-toastify";
 import { agentRegister } from "@/api/rpc";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { invalidateCache } from "@/app/actions";

@@ -1,4 +1,4 @@
 export const MetaData = {
-  title: "Dashboard",
-  description: "A Dashboard for Nucleus",
+  title: "Dashboard | Verisense",
+  description: "A Dashboard for Nucleus powered by Verisense",
 };
