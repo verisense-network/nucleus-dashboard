@@ -29,6 +29,7 @@ type PolkadotWalletStore = {
   selectAccount: (account: PolkadotAccount) => void;
   checkConnection: () => Promise<void>;
   updateBalance: () => Promise<void>;
+  getBalanceByAddress: (address: string) => Promise<{ balance: string; symbol: string }>;
 };
 
 type ComputedStore = {
@@ -212,6 +213,35 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
           console.error("ERR updateBalance:", error);
           set({ balance: "0", symbol: "" });
         }
+      },
+
+      getBalanceByAddress: async (address: string) => {
+        const api = await getPolkadotApi();
+        const accountInfo = await api.query.system.account(address);
+        
+        const balanceData = (accountInfo as any).data;
+        const freeBalance = balanceData.free;
+        
+        const decimals = api.registry.chainDecimals[0] || 10;
+        const symbol = api.registry.chainTokens[0] || 'DOT';
+        
+        const balanceBigInt = BigInt(freeBalance.toString());
+        const divisor = BigInt(10 ** decimals);
+        
+        const integerPart = balanceBigInt / divisor;
+        const fractionalPart = balanceBigInt % divisor;
+        
+        const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+        const trimmedFractional = fractionalStr.replace(/0+$/, '');
+        
+        const balanceInDecimal = trimmedFractional.length > 0 
+          ? `${integerPart}.${trimmedFractional}`
+          : integerPart.toString();
+
+        return {
+          balance: balanceInDecimal,
+          symbol: symbol,
+        };
       },
     })),
     {

@@ -19,7 +19,7 @@ export function AddressViewFormat({
 }: AddressViewFormatProps) {
   return (
     <Tooltip content={address}>
-      <span className={twMerge("text-gray-800 text-sm", className)}>
+      <span className={twMerge("text-zinc-400 text-sm", className)}>
         {bracket ? `(${formatAddress(address)})` : formatAddress(address)}
       </span>
     </Tooltip>

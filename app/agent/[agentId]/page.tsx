@@ -10,6 +10,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SecurityScheme, OAuth2SecurityScheme, APIKeySecurityScheme, HTTPAuthSecurityScheme, OpenIdConnectSecurityScheme } from "../../../types/a2a";
 import { Tooltip } from "@heroui/tooltip";
+import { User } from "@heroui/user";
+import { AddressViewFormat } from "@/utils/format";
+import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 
 interface AgentDetailPageProps {
   params: Promise<{
@@ -215,6 +218,9 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
     );
   };
 
+  const { getBalanceByAddress } = usePolkadotWalletStore.getInitialState();
+  const balance = await getBalanceByAddress(agent.ownerId);
+
   return (
     <div className="w-full mx-auto py-4 space-y-6">
       <div className="mb-6">
@@ -231,13 +237,28 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center">
-              <Avatar src={agentCard.iconUrl} />
+          <div className="flex items-center justify-between gap-3 w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+                <Avatar src={agentCard.iconUrl} />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold">{agentCard.name}</h2>
+                <p className="text-small text-default-500">Version {agentCard.version}</p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h2 className="text-xl font-semibold">{agentCard.name}</h2>
-              <p className="text-small text-default-500">Version {agentCard.version}</p>
+            <div>
+              <User
+                name="Owner"
+                description={
+                  <div className="flex flex-col gap-2">
+                    <AddressViewFormat address={agent.ownerId} bracket={false} />
+                    <div className="text-zinc-400 text-sm">
+                      balance: {balance.balance} {balance.symbol}
+                    </div>
+                  </div>
+                }
+              />
             </div>
           </div>
         </CardHeader>
@@ -258,14 +279,14 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
             </div>
 
             <div>
-              <h4 className="font-medium mb-2">Related Links</h4>
+              <h4 className="font-medium mb-2">Links</h4>
               <div className="space-y-2">
                 <Link href={agentCard.url} target="_blank" className="text-primary text-small flex items-center gap-1">
-                  Service URL <ExternalLink size={12} />
+                  Service URL({agentCard.url}) <ExternalLink size={12} />
                 </Link>
                 {agentCard.documentationUrl && (
                   <Link href={agentCard.documentationUrl} target="_blank" className="text-primary text-small flex items-center gap-1">
-                    Documentation <ExternalLink size={12} />
+                    Documentation({agentCard.documentationUrl}) <ExternalLink size={12} />
                   </Link>
                 )}
               </div>
