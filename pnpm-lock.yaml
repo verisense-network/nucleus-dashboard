@@ -176,9 +176,6 @@ importers:
       tweetnacl:
         specifier: ^1.0.3
         version: 1.0.3
-      typeinfo-ts:
-        specifier: file:.yalc/typeinfo-ts
-        version: file:.yalc/typeinfo-ts(@types/react@19.0.9)(bufferutil@4.0.9)(typescript@5.7.3)(utf-8-validate@5.0.10)(vite@7.0.0(@types/node@20.17.19)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.0))
       viem:
         specifier: ^2.23.11
         version: 2.23.11(bufferutil@4.0.9)(typescript@5.7.3)(utf-8-validate@5.0.10)
@@ -7663,9 +7660,6 @@ packages:
     resolution: {integrity: sha512-3KS2b+kL7fsuk/eJZ7EQdnEmQoaho/r6KUef7hxvltNA5DR8NAUM+8wJMbJyZ4G9/7i3v5zPBIMN5aybAh2/Jg==}
     engines: {node: '>= 0.4'}
 
-  typeinfo-ts@file:.yalc/typeinfo-ts:
-    resolution: {directory: .yalc/typeinfo-ts, type: directory}
-
   typescript@5.7.3:
     resolution: {integrity: sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==}
     engines: {node: '>=14.17'}
@@ -12217,7 +12211,7 @@ snapshots:
       '@polkadot/wasm-crypto': 7.4.1(@polkadot/util@13.5.2)(@polkadot/x-randomvalues@13.5.2(@polkadot/util@13.5.2)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1)))
       '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.2)
       '@polkadot/x-bigint': 13.5.2
-      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.2)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
+      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.1)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
       '@scure/base': 1.2.4
       tslib: 2.8.1
 
@@ -12252,7 +12246,7 @@ snapshots:
     dependencies:
       '@polkadot/util': 13.5.2
       '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.2)
-      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.2)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
+      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.1)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
       tslib: 2.8.1
 
   '@polkadot/wasm-crypto-asmjs@7.4.1(@polkadot/util@13.5.1)':
@@ -12282,7 +12276,7 @@ snapshots:
       '@polkadot/wasm-crypto-asmjs': 7.4.1(@polkadot/util@13.5.2)
       '@polkadot/wasm-crypto-wasm': 7.4.1(@polkadot/util@13.5.2)
       '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.2)
-      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.2)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
+      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.1)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
       tslib: 2.8.1
 
   '@polkadot/wasm-crypto-wasm@7.4.1(@polkadot/util@13.5.1)':
@@ -12316,7 +12310,7 @@ snapshots:
       '@polkadot/wasm-crypto-init': 7.4.1(@polkadot/util@13.5.2)(@polkadot/x-randomvalues@13.5.2(@polkadot/util@13.5.2)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1)))
       '@polkadot/wasm-crypto-wasm': 7.4.1(@polkadot/util@13.5.2)
       '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.2)
-      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.2)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
+      '@polkadot/x-randomvalues': 13.5.2(@polkadot/util@13.5.1)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))
       tslib: 2.8.1
 
   '@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1)':
@@ -12377,14 +12371,14 @@ snapshots:
   '@polkadot/x-randomvalues@13.5.1(@polkadot/util@13.5.1)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))':
     dependencies:
       '@polkadot/util': 13.5.1
-      '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.1)
+      '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.2)
       '@polkadot/x-global': 13.5.1
       tslib: 2.8.1
 
-  '@polkadot/x-randomvalues@13.5.2(@polkadot/util@13.5.2)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))':
+  '@polkadot/x-randomvalues@13.5.2(@polkadot/util@13.5.1)(@polkadot/wasm-util@7.4.1(@polkadot/util@13.5.1))':
     dependencies:
-      '@polkadot/util': 13.5.2
-      '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.1)
+      '@polkadot/util': 13.5.1
+      '@polkadot/wasm-util': 7.4.1(@polkadot/util@13.5.2)
       '@polkadot/x-global': 13.5.2
       tslib: 2.8.1
 
@@ -19091,30 +19085,6 @@ snapshots:
       is-typed-array: 1.1.15
       possible-typed-array-names: 1.1.0
       reflect.getprototypeof: 1.0.10
-
-  typeinfo-ts@file:.yalc/typeinfo-ts(@types/react@19.0.9)(bufferutil@4.0.9)(typescript@5.7.3)(utf-8-validate@5.0.10)(vite@7.0.0(@types/node@20.17.19)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.0)):
-    dependencies:
-      '@heroui/react': 2.8.0-beta.10(@types/react@19.0.9)(framer-motion@12.19.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(tailwindcss@4.1.11)
-      '@polkadot/api': 16.2.2(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      '@polkadot/types': 16.2.2
-      '@polkadot/types-codec': 16.2.2
-      '@polkadot/util': 13.5.2
-      '@tailwindcss/vite': 4.1.11(vite@7.0.0(@types/node@20.17.19)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.0))
-      framer-motion: 12.19.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
-      react-router: 7.6.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      react-router-dom: 7.6.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      tailwindcss: 4.1.11
-      vite-tsconfig-paths: 5.1.4(typescript@5.7.3)(vite@7.0.0(@types/node@20.17.19)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.0))
-    transitivePeerDependencies:
-      - '@emotion/is-prop-valid'
-      - '@types/react'
-      - bufferutil
-      - supports-color
-      - typescript
-      - utf-8-validate
-      - vite
 
   typescript@5.7.3: {}
 
