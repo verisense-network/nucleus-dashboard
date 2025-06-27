@@ -7,7 +7,7 @@ import { getNucleusAbi } from "@/app/actions";
 import TsFunctionExplorer from "./TsFunctionExplorer";
 import CodeBlock from "@/components/CodeBlock";
 import { transform } from 'sucrase';
-import { generateCode } from "./generator";
+import { generatePolkadotCode } from '@verisense-network/typeinfo-ts'
 import * as codecTypes from '@polkadot/types-codec';
 import { TypeRegistry } from '@polkadot/types';
 import { Registry } from "@polkadot/types/types";
@@ -15,6 +15,7 @@ import { HttpProvider, WsProvider } from "@polkadot/rpc-provider";
 import { ApiPromise } from "@polkadot/api";
 import { ENDPOINT } from "@/config/endpoint";
 import { u8aToHex } from "@polkadot/util";
+import { generateCode } from "./generator";
 
 interface AbiDetailsProps {
   nucleus: NucleusInfo;
@@ -38,7 +39,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
       }
       setAbiData(data);
 
-      const tsCode = await generateCode(data);
+      const tsCode = data?.functions ? generatePolkadotCode(data) : await generateCode(data);
 
       setTsCode(tsCode);
 
@@ -49,6 +50,138 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
       setLoading(false);
     }
   }, [nucleus.id]);
+
+  const extractAndExecuteCodeAfterInitApi = useCallback((jsCode: string) => {
+    const initApiFunctionStart = jsCode.indexOf('export async function initApi(endpoint)');
+    if (initApiFunctionStart === -1) {
+      console.log('not found initApi function');
+      return;
+    }
+
+    let braceCount = 0;
+    let functionStart = jsCode.indexOf('{', initApiFunctionStart);
+    let currentIndex = functionStart;
+    
+    if (functionStart === -1) {
+      console.log('not found initApi function start brace');
+      return;
+    }
+
+    braceCount = 1;
+    currentIndex = functionStart + 1;
+    
+    while (currentIndex < jsCode.length && braceCount > 0) {
+      if (jsCode[currentIndex] === '{') {
+        braceCount++;
+      } else if (jsCode[currentIndex] === '}') {
+        braceCount--;
+      }
+      currentIndex++;
+    }
+    
+    if (braceCount !== 0) {
+      console.log('initApi function brace not match');
+      return;
+    }
+
+    const codeAfterInitApi = jsCode.substring(currentIndex).trim();
+    
+    const processedCode = codeAfterInitApi
+      .replace(/export\s+const\s+/g, 'const ')
+      .replace(/export\s+let\s+/g, 'let ')
+      .replace(/export\s+var\s+/g, 'var ')
+      .replace(/export\s+function\s+/g, 'function ')
+      .replace(/export\s+async\s+function\s+/g, 'async function ')
+      .replace(/export\s+class\s+/g, 'class ')
+      .replace(/export\s+default\s+/g, '')
+      .replace(/export\s*\{[^}]*\}\s*;?\s*/g, '');
+
+    try {
+      const executeCode = `
+        function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
+
+        window._optionalChain = _optionalChain;
+
+        ${processedCode}
+        
+        const definedItems = {};
+        
+        const codeLines = \`${processedCode}\`.split('\\n');
+        codeLines.forEach(line => {
+          const trimmed = line.trim();
+          
+          // check class definition
+          const classMatch = trimmed.match(/^class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s+extends/);
+          if (classMatch) {
+            const className = classMatch[1];
+            try {
+              if (typeof eval(className) !== 'undefined') {
+                definedItems[className] = eval(className);
+                console.log('found class definition:', className);
+              }
+            } catch (e) {}
+          }
+          
+          // check function definition
+          const funcMatch = trimmed.match(/^(async\\s+)?function\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(/);
+          if (funcMatch) {
+            const funcName = funcMatch[2];
+            try {
+              if (typeof eval(funcName) === 'function') {
+                definedItems[funcName] = eval(funcName);
+                console.log('found function definition:', funcName);
+              }
+            } catch (e) {}
+          }
+          
+          // check const definition
+          const constMatch = trimmed.match(/^const\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=/);
+          if (constMatch) {
+            const constName = constMatch[1];
+            try {
+              if (typeof eval(constName) !== 'undefined') {
+                definedItems[constName] = eval(constName);
+                console.log('found constant definition:', constName);
+              }
+            } catch (e) {}
+          }
+          
+          // check window variable declaration
+          const windowAssignMatch = trimmed.match(/\\(window\\)\\.([A-Za-z_$][A-Za-z0-9_$]*)\\s*=/);
+          if (windowAssignMatch) {
+            const varName = windowAssignMatch[1];
+            try {
+              if (window[varName]) {
+                definedItems[varName] = window[varName];
+                console.log('found window variable declaration:', varName);
+              }
+            } catch (e) {}
+          }
+        });
+        
+        // register all defined items to window
+        Object.keys(definedItems).forEach(name => {
+          try {
+            window[name] = definedItems[name];
+            if (window.registry && typeof window.registry.register === 'function') {
+              window.registry.register({ [name]: definedItems[name] });
+            }
+            console.log('registered to window and registry:', name);
+          } catch (e) {
+            console.warn('register failed:', name, e);
+          }
+        });
+      `;
+      
+      const func = new Function('return (async function() {' + executeCode + '})();');
+      func.call(window);
+      
+      console.log('success execute and process code after initApi function');
+    } catch (error) {
+      console.error('error execute code after initApi function:', error);
+      console.error('error details:', error instanceof Error ? error.stack : String(error));
+    }
+  }, []);
 
   const extractAndDefineCodecImports = useCallback((jsCode: string) => {
     const importRegex = /import\s*{\s*([^}]+)\s*}\s*from\s*['"]@polkadot\/types-codec['"];?/gs;
@@ -95,433 +228,6 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     }
   }, []);
 
-  const extractClasses = useCallback((jsCode: string) => {
-    const classStartRegex = /export\s+class\s+(\w+)\s+extends\s+(\w+)\s*\{/g;
-    const foundClasses: string[] = [];
-    let match;
-    const classDefinitions: string[] = [];
-
-    while ((match = classStartRegex.exec(jsCode)) !== null) {
-      const className = match[1];
-      const baseClass = match[2];
-      const startIndex = match.index;
-      const openBraceIndex = match.index + match[0].length - 1;
-
-      let braceCount = 1;
-      let endIndex = openBraceIndex + 1;
-
-      while (endIndex < jsCode.length && braceCount > 0) {
-        if (jsCode[endIndex] === '{') {
-          braceCount++;
-        } else if (jsCode[endIndex] === '}') {
-          braceCount--;
-        }
-        endIndex++;
-      }
-
-      if (braceCount === 0) {
-        foundClasses.push(className);
-
-        const fullClassDef = jsCode.substring(startIndex, endIndex);
-        const classDefWithoutExport = fullClassDef.replace(/^export\s+/, '');
-        classDefinitions.push(classDefWithoutExport);
-      }
-    }
-
-    if (classDefinitions.length > 0) {
-      try {
-        for (const classDef of classDefinitions) {
-          const classNameMatch = classDef.match(/class\s+(\w+)\s+extends/);
-          if (classNameMatch) {
-            const className = classNameMatch[1];
-
-            const funcCode = `
-              ${classDef}
-              return ${className};
-            `;
-
-            const func = new Function(funcCode);
-            const ClassConstructor = func.call(
-              window,
-            );
-
-            (window as any)[className] = ClassConstructor;
-            console.log(`Successfully registered class ${className} to window`);
-          }
-        }
-
-        foundClasses.forEach(className => {
-          if ((window as any)[className]) {
-            (window as any).registry.register({
-              [className]: (window as any)[className],
-            });
-          }
-        });
-
-      } catch (error) {
-        console.error("Error executing class definitions:", error);
-      }
-    }
-
-    return foundClasses;
-  }, []);
-
-  const extractAndDefineConstantTypes = useCallback((jsCode: string) => {
-    const typeDefinitions: Array<{
-      name: string;
-      value: string;
-      originalLine: string;
-      dependencies: string[];
-    }> = [];
-
-    // match export const Name = Type; format
-    const constantTypeRegex = /export\s+const\s+([A-Za-z_$][A-Za-z0-9_]*)\s*=\s*([^;]+);/g;
-    let match;
-
-    while ((match = constantTypeRegex.exec(jsCode)) !== null) {
-      const typeName = match[1];
-      const typeValue = match[2].trim();
-      const originalLine = match[0];
-
-      // analyze dependencies
-      const dependencies: string[] = [];
-      const dependencyRegex = /\b([A-Z][A-Za-z0-9_]*)\b/g;
-      let depMatch;
-
-      while ((depMatch = dependencyRegex.exec(typeValue)) !== null) {
-        const depName = depMatch[1];
-        // exclude known base types and keywords
-        if (!['U8aFixed', 'U8aBitLength', 'U8', 'U16', 'U32', 'U64', 'U128', 'U256', 'I8', 'I16', 'I32', 'I64', 'I128', 'I256',
-          'Bool', 'Text', 'Bytes', 'Null', 'Option', 'Vec', 'Struct', 'Enum', 'Tuple', 'Result', 'with', 'as'].includes(depName)) {
-          dependencies.push(depName);
-        }
-      }
-
-      typeDefinitions.push({
-        name: typeName,
-        value: typeValue,
-        originalLine,
-        dependencies
-      });
-    }
-
-    console.log(`Found ${typeDefinitions.length} constant type definitions`);
-
-    // sort by dependencies, ensure dependent types are defined first
-    const sortedDefinitions = [...typeDefinitions];
-    const processed = new Set<string>();
-    const result: typeof typeDefinitions = [];
-
-    // simple topological sort
-    while (result.length < sortedDefinitions.length) {
-      let addedInThisRound = false;
-
-      for (const def of sortedDefinitions) {
-        if (processed.has(def.name)) continue;
-
-        // check if all dependencies are processed
-        const canProcess = def.dependencies.every(dep =>
-          processed.has(dep) ||
-          !typeDefinitions.some(td => td.name === dep) // dependency not in our definition list (external type)
-        );
-
-        if (canProcess) {
-          result.push(def);
-          processed.add(def.name);
-          addedInThisRound = true;
-        }
-      }
-
-      // if no types are added, there is a circular dependency or other problem, add remaining types in original order
-      if (!addedInThisRound) {
-        for (const def of sortedDefinitions) {
-          if (!processed.has(def.name)) {
-            result.push(def);
-            processed.add(def.name);
-          }
-        }
-        break;
-      }
-    }
-
-    // define types to window
-    result.forEach(({ name, value, originalLine }) => {
-      try {
-        console.log(`Defining type: ${name} = ${value}`);
-
-        // handle different type definitions
-        if (value.includes('.with(')) {
-          // handle factory function calls, e.g. U8aFixed.with(160 as U8aBitLength)
-          const factoryFuncCode = `
-            try {
-              const result = ${value};
-              (window).${name} = result;
-              console.log('Successfully defined factory type ${name}:', result);
-              return result;
-            } catch (error) {
-              console.error('Error defining factory type ${name}:', error);
-              return null;
-            }
-          `;
-
-          const func = new Function('codecTypes', 'window', factoryFuncCode);
-          const typeInstance = func.call(window, codecTypes, window);
-
-          if (typeInstance) {
-            (window as any)[name] = typeInstance;
-            (window as any).registry.register({
-              [name]: typeInstance,
-            });
-            console.log(`Successfully registered factory type ${name} to window and registry`);
-          }
-        } else {
-          // handle simple type references, e.g. U32, H160
-          if (codecTypes[value as keyof typeof codecTypes]) {
-            // direct codecTypes reference
-            (window as any)[name] = codecTypes[value as keyof typeof codecTypes];
-            (window as any).registry.register({
-              [name]: codecTypes[value as keyof typeof codecTypes],
-            });
-            console.log(`Successfully registered base type ${name} = ${value} to window and registry`);
-          } else if ((window as any)[value]) {
-            // reference already defined in window
-            (window as any)[name] = (window as any)[value];
-            (window as any).registry.register({
-              [name]: (window as any)[value],
-            });
-            console.log(`Successfully registered reference type ${name} = ${value} to window and registry`);
-          } else {
-            // try dynamic execution
-            try {
-              const evalCode = `
-                try {
-                  const result = ${value};
-                  (window).${name} = result;
-                  console.log('Successfully defined dynamic type ${name}:', result);
-                  return result;
-                } catch (error) {
-                  console.error('Error defining dynamic type ${name}:', error);
-                  return null;
-                }
-              `;
-
-              const func = new Function('codecTypes', 'window', evalCode);
-              const typeInstance = func.call(window, codecTypes, window);
-
-              if (typeInstance) {
-                (window as any)[name] = typeInstance;
-                (window as any).registry.register({
-                  [name]: typeInstance,
-                });
-                console.log(`Successfully registered dynamic type ${name} to window and registry`);
-              }
-            } catch (error) {
-              console.warn(`Cannot define type ${name} = ${value}:`, error);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error defining type ${name}:`, error);
-      }
-    });
-
-    console.log(`Constant type definitions completed, successfully registered ${result.length} types`);
-  }, []);
-
-  const extractAndDefineFunctions = useCallback((jsCode: string) => {
-    const functionDefinitions: Array<{
-      name: string;
-      isAsync: boolean;
-      parameters: string[];
-      body: string;
-      fullDefinition: string;
-    }> = [];
-    const functionPatterns = [
-      // Pattern 1: export async function name(...) {  (JavaScript, no types)
-      /export\s+async\s+function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*\{/g,
-      // Pattern 2: export function name(...) {  (JavaScript, no types)
-      /export\s+function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*\{/g,
-      // Pattern 3: More flexible - export (async)? function (JavaScript)
-      /export\s+(async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*\{/g
-    ];
-
-    functionPatterns.forEach((pattern, patternIndex) => {
-      pattern.lastIndex = 0; // Reset regex
-      let match;
-      let patternMatches = 0;
-
-      while ((match = pattern.exec(jsCode)) !== null) {
-        const isAsync = patternIndex === 0 || (patternIndex === 2 && !!match[1]);
-        const functionName = patternIndex === 2 ? match[2] : match[1];
-        const parametersStr = patternIndex === 2 ? match[3] : match[2]; // Updated for new regex groups
-        const startIndex = match.index;
-
-        // Re-extract parameters more carefully
-        const functionStartMatch = jsCode.substring(startIndex).match(/function\s+[A-Za-z_$][A-Za-z0-9_$]*\s*\(([^)]*)\)/);
-        const actualParameters = functionStartMatch ? functionStartMatch[1] : parametersStr;
-
-        // find the complete function body by counting braces
-        const openBraceIndex = jsCode.indexOf('{', startIndex);
-        if (openBraceIndex === -1) {
-          console.log(`No opening brace found for function ${functionName}`);
-          continue;
-        }
-
-        let braceCount = 1;
-        let endIndex = openBraceIndex + 1;
-
-        while (endIndex < jsCode.length && braceCount > 0) {
-          if (jsCode[endIndex] === '{') {
-            braceCount++;
-          } else if (jsCode[endIndex] === '}') {
-            braceCount--;
-          }
-          endIndex++;
-        }
-
-        if (braceCount === 0) {
-          const fullDefinition = jsCode.substring(startIndex, endIndex);
-          const functionBody = jsCode.substring(openBraceIndex + 1, endIndex - 1);
-
-          const parameters = actualParameters
-            .split(',')
-            .map(param => param.trim())
-            .filter(param => param)
-
-          functionDefinitions.push({
-            name: functionName,
-            isAsync,
-            parameters,
-            body: functionBody,
-            fullDefinition
-          });
-
-          patternMatches++;
-        } else {
-          console.log(`Brace mismatch for function ${functionName}, braceCount: ${braceCount}`);
-        }
-      }
-    });
-
-    console.log(`Found ${functionDefinitions.length} function definitions`);
-
-    // If no functions found, let's do a broader search to see what's in the code
-    if (functionDefinitions.length === 0) {
-      // Look for any function-like patterns
-      const broadSearch = /function\s+([A-Za-z_$][A-Za-z0-9_$]*)/g;
-      let broadMatch;
-      const foundFunctionNames = [];
-
-      while ((broadMatch = broadSearch.exec(jsCode)) !== null) {
-        foundFunctionNames.push(broadMatch[1]);
-      }
-
-      console.log('Found function names in code:', foundFunctionNames);
-
-      // Look for export patterns
-      const exportSearch = /export\s+[^;{]+/g;
-      let exportMatch;
-      const foundExports = [];
-
-      while ((exportMatch = exportSearch.exec(jsCode)) !== null) {
-        foundExports.push(exportMatch[0]);
-      }
-    }
-
-    // define functions to window
-    functionDefinitions.forEach(({ name, isAsync, parameters, body, fullDefinition }) => {
-      try {
-        console.log(`Defining function: ${name}`);
-
-        // Extract original parameter list with types for the function signature
-        const originalParamsMatch = fullDefinition.match(/function\s+[^(]*\(([^)]*)\)/);
-        const originalParams = originalParamsMatch ? originalParamsMatch[1] : parameters.join(', ');
-
-        // create function wrapper that has access to required globals
-        const functionWrapper = `
-          ${isAsync ? 'async ' : ''}function ${name}(${originalParams}) {
-              ${body}
-            }
-        `;
-
-        const func = new Function(`
-            ${functionWrapper}
-            
-            return ${name};
-          `);
-
-        const functionInstance = func.call(window, codecTypes, window);
-
-        if (functionInstance) {
-          (window as any)[name] = functionInstance;
-          console.log(`Successfully registered function ${name} to window`);
-        }
-      } catch (error) {
-        console.error(`Error defining function ${name}:`, error);
-      }
-    });
-
-    console.log(`Function definitions completed, successfully registered ${functionDefinitions.length} functions`);
-  }, []);
-
-  const extractAndDefineHelperFunctions = useCallback((jsCode: string) => {
-    const helperFunctions: { name: string; code: string }[] = [];
-    
-    const functionStartPattern = /function\s+(_[A-Za-z_$][A-Za-z0-9_$]*)\s*\([^)]*\)\s*\{/g;
-    let match;
-    
-    while ((match = functionStartPattern.exec(jsCode)) !== null) {
-      const functionName = match[1];
-      const startIndex = match.index;
-      const openBraceIndex = match.index + match[0].length - 1;
-      
-      let braceCount = 1;
-      let currentIndex = openBraceIndex + 1;
-      
-      while (currentIndex < jsCode.length && braceCount > 0) {
-        const char = jsCode[currentIndex];
-        if (char === '{') {
-          braceCount++;
-        } else if (char === '}') {
-          braceCount--;
-        }
-        currentIndex++;
-      }
-      
-      if (braceCount === 0) {
-        const endIndex = currentIndex;
-        const functionCode = jsCode.substring(startIndex, endIndex);
-        
-        helperFunctions.push({
-          name: functionName,
-          code: functionCode
-        });
-      } else {
-        console.log(`function ${functionName} braceCount: ${braceCount}`);
-      }
-    }
-    
-    helperFunctions.forEach(({ name, code }) => {
-      try {
-        const func = new Function(`
-          ${code}
-          return ${name};
-        `);
-        
-        const functionInstance = func();
-        if (functionInstance) {
-          (window as any)[name] = functionInstance;
-          console.log(`Successfully registered helper function ${name} to window`);
-        }
-      } catch (error) {
-        console.error(`Error registering helper function ${name}:`, error);
-        console.error(`helper function code:`, code);
-      }
-    });
-    
-    console.log(`helper functions registered, total ${helperFunctions.length} functions`);
-  }, []);
-
   const defineCodecTypesToWindow = useCallback((tsCode: string) => {
     (window as any).u8aToHex = u8aToHex;
     (window as any).codecTypes = codecTypes;
@@ -535,22 +241,16 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
 
     const jsCode = transform(tsCode, { transforms: ['typescript'] }).code;
 
-    extractAndDefineHelperFunctions(jsCode);
-
-    extractAndDefineCodecImports(jsCode);
-
-    extractClasses(jsCode);
-
-    extractAndDefineConstantTypes(jsCode);
-
-    extractAndDefineFunctions(jsCode);
-
     const api = new ApiPromise({
       provider: new WsProvider(ENDPOINT.replace('http', 'ws')),
     });
 
     (window as any).api = api;
-  }, [extractAndDefineCodecImports, extractClasses, extractAndDefineConstantTypes, extractAndDefineFunctions, extractAndDefineHelperFunctions]);
+
+    extractAndDefineCodecImports(jsCode);
+
+    extractAndExecuteCodeAfterInitApi(jsCode);
+  }, [extractAndDefineCodecImports, extractAndExecuteCodeAfterInitApi]);
 
   useEffect(() => {
     loadAbiData();
