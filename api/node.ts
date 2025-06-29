@@ -1,9 +1,8 @@
-import { ENDPOINT } from "@/config/endpoint";
 import { getPolkadotApi } from "@/lib/polkadotApi";
 import { NetworkStats, NodeDetail, NodeInfo } from "@/types/node";
 
-export async function getNodeInfoAPI(): Promise<NodeInfo> {
-  const api = await getPolkadotApi();
+export async function getNodeInfoAPI(endpoint: string): Promise<NodeInfo> {
+  const api = await getPolkadotApi(endpoint);
 
   const latestHeader = await api.rpc.chain.getHeader();
   const bestNumber = latestHeader.number.toNumber();
@@ -22,8 +21,8 @@ export async function getNodeInfoAPI(): Promise<NodeInfo> {
   };
 }
 
-export async function getNetworkStatsAPI(): Promise<NetworkStats> {
-  const api = await getPolkadotApi();
+export async function getNetworkStatsAPI(endpoint: string): Promise<NetworkStats> {
+  const api = await getPolkadotApi(endpoint);
   const totalAccounts = (await api.query.system.account.entries()).length;
   const totalNucleus = (await api.query.nucleus.nuclei.entries()).length;
 
@@ -40,13 +39,12 @@ export async function getNetworkStatsAPI(): Promise<NetworkStats> {
   };
 }
 
-export async function getNodeDetailAPI(): Promise<NodeDetail> {
-  const nodeInfo = await getNodeInfoAPI();
-  const networkStats = await getNetworkStatsAPI();
+export async function getNodeDetailAPI(endpoint: string): Promise<NodeDetail> {
+  const nodeInfo = await getNodeInfoAPI(endpoint);
+  const networkStats = await getNetworkStatsAPI(endpoint);
 
   return {
     nodeInfo,
     networkStats,
-    endpoint: ENDPOINT,
   };
 } 

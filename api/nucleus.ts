@@ -1,4 +1,3 @@
-import { ENDPOINT } from "@/config/endpoint";
 import { getPolkadotApi } from "@/lib/polkadotApi";
 import { getRpcClient } from "@/lib/rpcClient";
 import { NucleusInfo } from "@/types/nucleus";
@@ -6,8 +5,8 @@ import { decodeAddress, encodeAddress } from "@polkadot/util-crypto";
 
 const VERISENSE_PREFIX = 137
 
-export async function getNucleusListAPI(): Promise<NucleusInfo[]> {
-  const api = await getPolkadotApi();
+export async function getNucleusListAPI(endpoint: string): Promise<NucleusInfo[]> {
+  const api = await getPolkadotApi(endpoint);
   
   const entries = await api.query.nucleus.nuclei.entries();
 
@@ -33,8 +32,8 @@ export async function getNucleusListAPI(): Promise<NucleusInfo[]> {
   return filteredResult;
 }
 
-export async function getNucleusByIdAPI(id: string): Promise<NucleusInfo> {
-  const api = await getPolkadotApi();
+export async function getNucleusByIdAPI(endpoint: string, id: string): Promise<NucleusInfo> {
+  const api = await getPolkadotApi(endpoint);
 
   const accountId = decodeAddress(id);
 
@@ -49,8 +48,7 @@ export async function getNucleusByIdAPI(id: string): Promise<NucleusInfo> {
   };
 }
 
-export async function getNucleusAbiAPI(id: string): Promise<any> {
-  const rpcUrl = `${ENDPOINT}/${id}`;
+export async function getNucleusAbiAPI(rpcUrl: string): Promise<any> {
   const provider = await getRpcClient(rpcUrl);
 
   const res = await provider.request({ method: "abi", params: [] })

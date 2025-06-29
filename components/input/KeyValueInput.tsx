@@ -11,6 +11,7 @@ interface KeyValueInputProps {
     key?: string;
     value?: string;
   };
+  isDisabled?: boolean;
 }
 
 export const KeyValueInput: React.FC<KeyValueInputProps> = ({
@@ -20,7 +21,8 @@ export const KeyValueInput: React.FC<KeyValueInputProps> = ({
   placeholder = {
     key: 'Key',
     value: 'Value'
-  }
+  },
+  isDisabled = false
 }) => {
   return (
     <Controller
@@ -41,6 +43,7 @@ export const KeyValueInput: React.FC<KeyValueInputProps> = ({
                     newParams[e.target.value] = value;
                     field.onChange(newParams);
                   }}
+                  isReadOnly={isDisabled}
                 />
                 <Input
                   value={value as string}
@@ -50,6 +53,7 @@ export const KeyValueInput: React.FC<KeyValueInputProps> = ({
                     newParams[key] = e.target.value;
                     field.onChange(newParams);
                   }}
+                  isReadOnly={isDisabled}
                 />
                 <Button
                   type="button"
@@ -62,6 +66,7 @@ export const KeyValueInput: React.FC<KeyValueInputProps> = ({
                     delete newParams[key];
                     field.onChange(newParams);
                   }}
+                  isDisabled={isDisabled}
                 >
                   <Trash2 size={16} />
                 </Button>
@@ -78,6 +83,7 @@ export const KeyValueInput: React.FC<KeyValueInputProps> = ({
                 newParams[''] = '';
                 field.onChange(newParams);
               }}
+              isDisabled={isDisabled}
             >
               Add Parameter
             </Button>

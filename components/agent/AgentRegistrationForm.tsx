@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
-import { Button, CardHeader } from '@heroui/react';
+import { Alert, Button, CardHeader } from '@heroui/react';
 import { Card, CardBody } from '@heroui/react';
 import { Input, Textarea, Select, SelectItem } from '@heroui/react';
 import { Checkbox, Switch } from '@heroui/react';
@@ -13,6 +13,9 @@ import { TagsInput } from '../input/TagsInput';
 import { OAuth2FlowsInput } from '../input/OAuth2FlowsInput';
 import { KeyValueInput } from '../input/KeyValueInput';
 import Link from 'next/link';
+import { getAgentById } from '@/app/actions';
+import { useEndpointStore } from '@/stores/endpoint';
+import { toast } from 'react-toastify';
 
 
 interface SecuritySchemeFormData {
@@ -35,6 +38,7 @@ interface FormData extends Omit<AgentCard, 'securitySchemes' | 'security'> {
 interface AgentRegistrationFormProps {
   onSubmit: (data: AgentCard) => Promise<void>;
   isLoading?: boolean;
+  agentCardId?: string | null;
 }
 
 const testData = {
@@ -105,12 +109,15 @@ const testData = {
 export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   onSubmit,
   isLoading = false,
+  agentCardId = ''
 }) => {
-  const [isOpenJsonImport, setIsOpenJsonImport] = useState(false);
+  const [isOpenForm, setIsOpenForm] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState('');
-  const [endpoint, setEndpoint] = useState('');
+  const [endpointUrl, setEndpointUrl] = useState('');
+  const [endpointUrlError, setEndpointUrlError] = useState('');
   const [isLoadingAgentCard, setIsLoadingAgentCard] = useState(false);
+  const { endpoint } = useEndpointStore();
 
   const {
     control,
@@ -269,7 +276,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     reset();
   };
 
-  const parseJsonData = (input?: string) => {
+  const parseJsonData = useCallback((input?: string) => {
     try {
       setJsonError('');
       const parsedData = JSON.parse(input || jsonInput);
@@ -341,7 +348,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     } catch (error) {
       setJsonError(error instanceof Error ? error.message : 'Invalid JSON format');
     }
-  };
+  }, [jsonInput, reset]);
 
   const parseTestData = () => {
     parseJsonData(JSON.stringify(testData));
@@ -376,32 +383,51 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     setJsonError('');
   };
 
-  const loadAgentCard = async () => {
-    if (!endpoint.trim()) {
-      setJsonError('Please enter a valid endpoint address');
+  const loadAgentCardFromEndpoint = useCallback(async () => {
+    if (!endpointUrl.trim()) {
+      setEndpointUrlError('Please enter a valid endpoint address');
       return;
     }
 
     setIsLoadingAgentCard(true);
     try {
-      setJsonError('');
-      const response = await fetch(`/api/proxy-agent-card?endpoint=${encodeURIComponent(endpoint)}`);
-      
+      setEndpointUrlError('');
+      const response = await fetch(`/api/proxy-agent-card?endpoint=${encodeURIComponent(endpointUrl)}`);
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
       parseJsonData(JSON.stringify(data));
+      setIsOpenForm(true);
     } catch (error) {
       console.error('Error loading agent card:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setJsonError(`Failed to load: ${errorMessage}`);
+      setEndpointUrlError(`Failed to load: ${errorMessage}`);
     } finally {
       setIsLoadingAgentCard(false);
     }
-  }
+  }, [endpointUrl, parseJsonData]);
+
+  useEffect(() => {
+    const fetchAgentCard = async () => {
+      toast.loading('Loading agent card...');
+      if (agentCardId && endpoint) {
+        const agentCard = await getAgentById(endpoint, agentCardId);
+        if (agentCard.success) {
+          const url = agentCard.data?.agentCard.url;
+          if (url) {
+            setEndpointUrl(url);
+            await loadAgentCardFromEndpoint();
+          }
+        }
+      }
+      toast.dismiss();
+    }
+    fetchAgentCard();
+  }, [agentCardId, endpoint, loadAgentCardFromEndpoint]);
 
   return (
     <div className="mx-auto space-y-6">
@@ -414,95 +440,93 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
             Faucet
           </Button>
         </Link>
-        <Button
-          color="primary"
-          variant="flat"
-          onPress={() => setIsOpenJsonImport(!isOpenJsonImport)}
-        >
-          Import
-        </Button>
       </div>
-      {isOpenJsonImport && (
-        <Card>
-          <CardHeader>
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <FileText size={20} />
-              Import
-            </h3>
-          </CardHeader>
-          <CardBody>
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Input
-                  label="From Endpoint"
-                  placeholder="Enter Agent server address (e.g. https://example.com)"
-                  value={endpoint}
-                  labelPlacement='outside'
-                  onChange={(e) => setEndpoint(e.target.value)}
-                  description="Enter the base URL of the Agent server, the system will automatically load /.well-known/agent.json"
-                />
-                <Button
-                  color="primary"
-                  variant="flat"
-                  onPress={loadAgentCard}
-                  isLoading={isLoadingAgentCard}
-                  disabled={isLoadingAgentCard || !endpoint.trim()}
-                >
-                  {isLoadingAgentCard ? 'Loading...' : 'Load Agent Card'}
-                </Button>
-              </div>
-
-              <Textarea
-                label="From AgentCard JSON"
+      {agentCardId && <Alert color="warning">Updating Agent Card: {agentCardId}</Alert>}
+      <Card>
+        <CardHeader>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <FileText size={20} />
+            Import
+          </h3>
+        </CardHeader>
+        <CardBody>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Input
+                label="From Endpoint"
+                placeholder="Enter Agent server address (e.g. https://example.com)"
+                value={endpointUrl}
                 labelPlacement='outside'
-                placeholder="Paste your AgentCard JSON here..."
-                value={jsonInput}
-                onChange={(e) => setJsonInput(e.target.value)}
-                minRows={6}
-                isInvalid={!!jsonError}
-                errorMessage={jsonError}
-                description="Support complete AgentCard JSON format data"
+                onChange={(e) => setEndpointUrl(e.target.value)}
+                isInvalid={!!endpointUrlError}
+                errorMessage={endpointUrlError}
+                description="Enter the base URL of the Agent server, the system will automatically load /.well-known/agent.json"
               />
+              <Button
+                color="primary"
+                variant="flat"
+                onPress={loadAgentCardFromEndpoint}
+                isLoading={isLoadingAgentCard}
+                disabled={isLoadingAgentCard || !endpointUrl.trim()}
+              >
+                {isLoadingAgentCard ? 'Loading...' : 'Load Agent Card'}
+              </Button>
+            </div>
 
-              <div className="flex gap-2">
-                <Button
-                  color="primary"
-                  variant="flat"
-                  onPress={() => parseJsonData()}
-                  disabled={!jsonInput.trim() && !isLoading}
-                >
-                  Parse
-                </Button>
+            <Textarea
+              label="From AgentCard JSON (from your code)"
+              labelPlacement='outside'
+              placeholder="Paste your AgentCard JSON here..."
+              value={jsonInput}
+              onChange={(e) => setJsonInput(e.target.value)}
+              minRows={6}
+              isInvalid={!!jsonError}
+              errorMessage={jsonError}
+              description="Support complete AgentCard JSON format data"
+            />
 
+            <div className="flex gap-2">
+              <Button
+                color="primary"
+                variant="flat"
+                onPress={() => parseJsonData()}
+                disabled={!jsonInput.trim() && !isLoading}
+              >
+                Parse
+              </Button>
+
+              <Button
+                color="warning"
+                variant="flat"
+                onPress={clearForm}
+              >
+                Clear Form
+              </Button>
+
+              {process.env.NODE_ENV === 'development' && (
                 <Button
                   color="warning"
                   variant="flat"
-                  onPress={clearForm}
+                  onPress={parseTestData}
                 >
-                  Clear Form
+                  Parse Test Data
                 </Button>
-
-                {process.env.NODE_ENV === 'development' && (
-                  <Button
-                    color="warning"
-                    variant="flat"
-                    onPress={parseTestData}
-                  >
-                    Parse Test Data
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
-          </CardBody>
-        </Card>
-      )}
+          </div>
+        </CardBody>
+      </Card>
 
-      <Card>
+      {isOpenForm && <Card>
         <CardBody>
           <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+            <div>
+              <Alert color="warning" variant="flat">
+                Update Agent Card in your code, here is just read and display
+              </Alert>
+            </div>
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Basic Information</h3>
-
 
               <Controller
                 name="name"
@@ -516,6 +540,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     isInvalid={!!errors.name}
                     errorMessage={errors.name?.message}
                     isRequired
+                    isReadOnly
                   />
                 )}
               />
@@ -532,6 +557,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     isInvalid={!!errors.description}
                     errorMessage={errors.description?.message}
                     isRequired
+                    isReadOnly
                   />
                 )}
               />
@@ -554,6 +580,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     isInvalid={!!errors.url}
                     errorMessage={errors.url?.message}
                     isRequired
+                    isReadOnly
                   />
                 )}
               />
@@ -574,6 +601,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     placeholder="https://example.com/icon.png"
                     isInvalid={!!errors.iconUrl}
                     errorMessage={errors.iconUrl?.message}
+                    isReadOnly
                   />
                 )}
               />
@@ -590,6 +618,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     isInvalid={!!errors.version}
                     errorMessage={errors.version?.message}
                     isRequired
+                    isReadOnly
                   />
                 )}
               />
@@ -610,6 +639,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     placeholder="https://example.com/docs"
                     isInvalid={!!errors.documentationUrl}
                     errorMessage={errors.documentationUrl?.message}
+                    isReadOnly
                   />
                 )}
               />
@@ -628,6 +658,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     {...field}
                     label="Organization Name"
                     placeholder="Your organization name"
+                    isReadOnly
                   />
                 )}
               />
@@ -648,6 +679,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     placeholder="https://your-organization.com"
                     isInvalid={!!errors.provider?.url}
                     errorMessage={errors.provider?.url?.message}
+                    isReadOnly
                   />
                 )}
               />
@@ -674,6 +706,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       },
                     })
                   }
+                  isDisabled
                 >
                   Add Security Scheme
                 </Button>
@@ -691,6 +724,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                         variant="flat"
                         isIconOnly
                         onPress={() => removeSecurityScheme(index)}
+                        isDisabled
                       >
                         <Trash2 size={16} />
                       </Button>
@@ -708,6 +742,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           isInvalid={!!errors.securitySchemesArray?.[index]?.schemeName}
                           errorMessage={errors.securitySchemesArray?.[index]?.schemeName?.message}
                           isRequired
+                          isReadOnly
                         />
                       )}
                     />
@@ -759,6 +794,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                             setValue(`securitySchemesArray.${index}.scheme`, newScheme);
                           }}
                           isRequired
+                          isDisabled
                         >
                           <SelectItem key="apiKey">API Key</SelectItem>
                           <SelectItem key="http">HTTP Authentication</SelectItem>
@@ -783,6 +819,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                                 field.onChange(Array.from(keys)[0]);
                               }}
                               isRequired
+                              isDisabled
                             >
                               <SelectItem key="header">Header</SelectItem>
                               <SelectItem key="query">Query Parameter</SelectItem>
@@ -801,6 +838,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                               label="API Key Name"
                               placeholder="X-API-Key"
                               isRequired
+                              isDisabled
                             />
                           )}
                         />
@@ -819,6 +857,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                               label="HTTP Scheme"
                               placeholder="bearer"
                               isRequired
+                              isDisabled
                             />
                           )}
                         />
@@ -831,6 +870,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                               {...field}
                               label="Bearer Format"
                               placeholder="JWT"
+                              isDisabled
                             />
                           )}
                         />
@@ -854,6 +894,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                             label="OpenID Connect URL"
                             placeholder="https://example.com/.well-known/openid_configuration"
                             isRequired
+                            isDisabled
                           />
                         )}
                       />
@@ -865,6 +906,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                         control={control}
                         label="OAuth2 Flows"
                         isRequired
+                        isDisabled
                       />
                     )}
 
@@ -876,6 +918,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           {...field}
                           label="Description"
                           placeholder="Describe this security scheme"
+                          isReadOnly
                         />
                       )}
                     />
@@ -907,6 +950,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       scopes: [],
                     })
                   }
+                  isDisabled
                 >
                   Add Security
                 </Button>
@@ -924,6 +968,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                         variant="flat"
                         isIconOnly
                         onPress={() => removeSecurity(index)}
+                        isDisabled
                       >
                         <Trash2 size={16} />
                       </Button>
@@ -944,6 +989,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                               field.onChange(Array.from(keys)[0]);
                             }}
                             isRequired
+                            isDisabled
                           >
                             {availableSchemes.map((schemeName) => (
                               <SelectItem key={schemeName}>
@@ -960,6 +1006,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       control={control}
                       label="Scopes"
                       placeholder="Enter scopes (e.g., read, write, admin)"
+                      isDisabled
                     />
                   </div>
                 </Card>
@@ -986,6 +1033,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     <Checkbox
                       isSelected={field.value}
                       onValueChange={field.onChange}
+                      isReadOnly
                     >
                       Streaming Response (SSE)
                     </Checkbox>
@@ -999,6 +1047,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     <Checkbox
                       isSelected={field.value}
                       onValueChange={field.onChange}
+                      isReadOnly
                     >
                       Push Notifications
                     </Checkbox>
@@ -1012,6 +1061,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     <Checkbox
                       isSelected={field.value}
                       onValueChange={field.onChange}
+                      isReadOnly
                     >
                       Exposes task status change history
                     </Checkbox>
@@ -1036,6 +1086,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                         params: {}
                       });
                     }}
+                    isDisabled
                   >
                     Add Extension
                   </Button>
@@ -1053,6 +1104,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           variant="flat"
                           isIconOnly
                           onPress={() => removeExtension(index)}
+                          isDisabled
                         >
                           <Trash2 size={16} />
                         </Button>
@@ -1070,6 +1122,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                             isInvalid={!!errors.capabilities?.extensions?.[index]?.uri}
                             errorMessage={errors.capabilities?.extensions?.[index]?.uri?.message}
                             isRequired
+                            isReadOnly
                           />
                         )}
                       />
@@ -1082,6 +1135,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                             {...field}
                             label="Description"
                             placeholder="Describe how this agent uses this extension"
+                            isReadOnly
                           />
                         )}
                       />
@@ -1093,6 +1147,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           <Checkbox
                             isSelected={field.value}
                             onValueChange={field.onChange}
+                            isReadOnly
                           >
                             Required
                           </Checkbox>
@@ -1111,6 +1166,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                               key: "Parameter name",
                               value: "Parameter value"
                             }}
+                            isDisabled
                           />
                         )}
                       />
@@ -1146,6 +1202,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     isInvalid={!!errors.defaultInputModes}
                     errorMessage={errors.defaultInputModes?.message}
                     isRequired
+                    isDisabled
                   >
                     {mediaTypes.map((type) => (
                       <SelectItem key={type}>
@@ -1171,6 +1228,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                     isInvalid={!!errors.defaultOutputModes}
                     errorMessage={errors.defaultOutputModes?.message}
                     isRequired
+                    isDisabled
                   >
                     {mediaTypes.map((type) => (
                       <SelectItem key={type}>
@@ -1204,6 +1262,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       outputModes: [],
                     })
                   }
+                  isDisabled
                 >
                   Add Skill
                 </Button>
@@ -1221,6 +1280,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                         variant="flat"
                         isIconOnly
                         onPress={() => removeSkill(index)}
+                        isDisabled
                       >
                         <Trash2 size={16} />
                       </Button>
@@ -1238,6 +1298,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           isInvalid={!!errors.skills?.[index]?.id}
                           errorMessage={errors.skills?.[index]?.id?.message}
                           isRequired
+                          isDisabled
                         />
                       )}
                     />
@@ -1254,6 +1315,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           isInvalid={!!errors.skills?.[index]?.name}
                           errorMessage={errors.skills?.[index]?.name?.message}
                           isRequired
+                          isDisabled
                         />
                       )}
                     />
@@ -1270,6 +1332,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                           isInvalid={!!errors.skills?.[index]?.description}
                           errorMessage={errors.skills?.[index]?.description?.message}
                           isRequired
+                          isDisabled
                         />
                       )}
                     />
@@ -1279,6 +1342,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       control={control}
                       label="Tags"
                       placeholder="Enter tags (e.g., cooking, customer-support, billing)"
+                      isDisabled
                     />
 
                     <Controller
@@ -1293,6 +1357,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                             const examples = e.target.value.split('\n').map(ex => ex.trim()).filter(Boolean);
                             field.onChange(examples);
                           }}
+                          isReadOnly
                         />
                       )}
                     />
@@ -1314,6 +1379,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       onValueChange={field.onChange}
                       size="lg"
                       color="primary"
+                      isReadOnly
                       classNames={{
                         base: "inline-flex flex-row-reverse w-full max-w-full bg-content1 hover:bg-content2 items-center justify-between cursor-pointer rounded-lg gap-2 p-4 border-2 border-zinc-200 dark:border-zinc-800 data-[selected=true]:border-primary",
                         wrapper: "p-0 h-4 overflow-visible",
@@ -1340,14 +1406,14 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                 color="primary"
                 size="lg"
                 isLoading={isLoading}
-                disabled={isLoading}
+                isDisabled={isLoading}
               >
                 {isLoading ? 'Registering...' : 'Register Agent'}
               </Button>
             </div>
           </form>
         </CardBody>
-      </Card>
+      </Card>}
     </div>
   );
 };

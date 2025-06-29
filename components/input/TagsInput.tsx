@@ -10,9 +10,10 @@ interface TagsInputProps {
   control: Control<any, any>;
   label?: string;
   placeholder?: string;
+  isDisabled?: boolean;
 }
 
-export const TagsInput: React.FC<TagsInputProps> = ({ name, control, label, placeholder }) => {
+export const TagsInput: React.FC<TagsInputProps> = ({ name, control, label, placeholder, isDisabled }) => {
   const [newTag, setNewTag] = useState('');
 
   return (
@@ -48,6 +49,7 @@ export const TagsInput: React.FC<TagsInputProps> = ({ name, control, label, plac
                     addTag();
                   }
                 }}
+                isReadOnly={isDisabled}
               />
               <Button
                 type="button"
@@ -55,7 +57,7 @@ export const TagsInput: React.FC<TagsInputProps> = ({ name, control, label, plac
                 color="primary"
                 variant="flat"
                 onPress={addTag}
-                isDisabled={!newTag.trim() || field.value?.includes(newTag.trim())}
+                isDisabled={isDisabled || !newTag.trim() || field.value?.includes(newTag.trim())}
                 startContent={<Plus size={16} />}
               >
                 Add
@@ -77,6 +79,7 @@ export const TagsInput: React.FC<TagsInputProps> = ({ name, control, label, plac
                         isIconOnly
                         className="w-4 h-4 min-w-4"
                         onPress={() => removeTag(tag)}
+                        isDisabled={isDisabled}
                       >
                         <Trash2 size={12} />
                       </Button>

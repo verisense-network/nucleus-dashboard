@@ -1,11 +1,10 @@
-import { ENDPOINT } from "@/config/endpoint";
 import { ApiPromise, WsProvider, HttpProvider } from "@polkadot/api";
 
 const connectionCache = new Map<string, ApiPromise>();
 
-export async function getPolkadotApi(endpoint?: string, maxRetries: number = 3, retryDelay: number = 2000) {
-  const url = endpoint || ENDPOINT;
-  
+export async function getPolkadotApi(endpoint: string, maxRetries: number = 3, retryDelay: number = 2000) {
+  const url = endpoint;
+
   if (connectionCache.has(url)) {
     const cachedApi = connectionCache.get(url)!;
     try {
@@ -30,7 +29,7 @@ export async function getPolkadotApi(endpoint?: string, maxRetries: number = 3, 
       console.log(`attempt to connect to Polkadot API (${attempt}/${maxRetries}): ${url}`);
       
       const provider = url.startsWith("http") 
-        ? new HttpProvider(url) 
+        ? new HttpProvider(url)
         : new WsProvider(url, 1000);
       
       if (provider instanceof WsProvider) {

@@ -4,12 +4,17 @@ import AgentRegistrationForm from "@/components/agent/AgentRegistrationForm";
 import { useState } from "react";
 import { AgentCard } from "@/types/a2a";
 import { toast } from "react-toastify";
-import { agentRegister } from "@/api/rpc";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { invalidateCache } from "@/app/actions";
+import { useEndpointStore } from "@/stores/endpoint";
+import { useSearchParams } from "next/navigation";
+import { registerAgent } from "@/api/rpc";
 
 export default function AgentRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const { endpoint } = useEndpointStore();
+  const searchParams = useSearchParams();
+  const agentCardId = searchParams.get('agentCardId');
 
   const handleSubmit = async (data: AgentCard) => {
     setIsLoading(true);
@@ -29,15 +34,15 @@ export default function AgentRegistrationPage() {
         return;
       }
 
-      const finalizedHash = await agentRegister(data, toastId);
+      const resFinalizedHash = await registerAgent(endpoint, data, toastId, agentCardId);
 
       toast.update(toastId, {
         type: 'success',
-        render: `Agent registration successful! Transaction finalized: ${finalizedHash.slice(0, 10)}...`,
+        render: `Agent registration successful! Transaction finalized: ${resFinalizedHash.slice(0, 10)}...`,
         isLoading: false,
         autoClose: 3500,
       });
-      console.log('Transaction finalized with hash:', finalizedHash);
+      console.log('Transaction finalized with hash:', resFinalizedHash);
 
       invalidateCache('/');
     } catch (error) {
@@ -60,6 +65,7 @@ export default function AgentRegistrationPage() {
       <AgentRegistrationForm
         onSubmit={handleSubmit}
         isLoading={isLoading}
+        agentCardId={agentCardId}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { create } from "zustand";
 import { createComputed } from "zustand-computed";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { useEndpointStore } from "./endpoint";
 
 export interface PolkadotAccount {
   address: string;
@@ -183,7 +184,8 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
             return;
           }
 
-          const api = await getPolkadotApi();
+          const { endpoint } = useEndpointStore.getState();
+          const api = await getPolkadotApi(endpoint);
           const accountInfo = await api.query.system.account(currentState.selectedAccount.address);
           
           const balanceData = (accountInfo as any).data;
@@ -216,7 +218,8 @@ export const usePolkadotWalletStore = create<PolkadotWalletStore>()(
       },
 
       getBalanceByAddress: async (address: string) => {
-        const api = await getPolkadotApi();
+        const { endpoint } = useEndpointStore.getState();
+        const api = await getPolkadotApi(endpoint);
         const accountInfo = await api.query.system.account(address);
         
         const balanceData = (accountInfo as any).data;

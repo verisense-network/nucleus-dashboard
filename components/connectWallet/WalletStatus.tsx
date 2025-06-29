@@ -32,7 +32,7 @@ export function WalletStatus() {
         onPress={connectWallet}
         isLoading={isConnecting}
       >
-        {isConnecting ? "Connecting..." : "Connect Wallet"}
+        {isConnecting ? "Connecting..." : "Connect"}
       </Button>
     );
   }

@@ -13,9 +13,9 @@ import { TypeRegistry } from '@polkadot/types';
 import { Registry } from "@polkadot/types/types";
 import { HttpProvider, WsProvider } from "@polkadot/rpc-provider";
 import { ApiPromise } from "@polkadot/api";
-import { ENDPOINT } from "@/config/endpoint";
 import { u8aToHex } from "@polkadot/util";
 import { generateCode } from "./generator";
+import { useEndpointStore } from "@/stores/endpoint";
 
 interface AbiDetailsProps {
   nucleus: NucleusInfo;
@@ -27,13 +27,15 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
   const [tsCode, setTsCode] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("types");
+  const { endpoint } = useEndpointStore();
 
 
   const loadAbiData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { success, data } = await getNucleusAbi(nucleus.id);
+      const rpcUrl = `${endpoint}/${nucleus.id}`;
+      const { success, data } = await getNucleusAbi(rpcUrl);
       if (!success) {
         throw new Error(data || "Failed to load ABI");
       }
@@ -242,7 +244,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     const jsCode = transform(tsCode, { transforms: ['typescript'] }).code;
 
     const api = new ApiPromise({
-      provider: new WsProvider(ENDPOINT.replace('http', 'ws')),
+      provider: new WsProvider(endpoint.replace('http', 'ws')),
     });
 
     (window as any).api = api;
@@ -250,7 +252,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     extractAndDefineCodecImports(jsCode);
 
     extractAndExecuteCodeAfterInitApi(jsCode);
-  }, [extractAndDefineCodecImports, extractAndExecuteCodeAfterInitApi]);
+  }, [endpoint, extractAndDefineCodecImports, extractAndExecuteCodeAfterInitApi]);
 
   useEffect(() => {
     loadAbiData();

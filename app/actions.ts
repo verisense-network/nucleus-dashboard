@@ -8,6 +8,7 @@ import { AgentCard } from "@/types/a2a";
 import { APIResponse } from "@/types/api";
 import { getAgentByIdAPI, getAgentListAPI } from "@/api/rpc";
 import { revalidatePath } from "next/cache";
+import { Id } from "react-toastify";
 
 
 export async function invalidateCache(path: string) {
@@ -15,9 +16,9 @@ export async function invalidateCache(path: string) {
   return { success: true };
 }
 
-export async function getNucleusList(): Promise<NucleusListResponse> {
+export async function getNucleusList(endpoint: string): Promise<NucleusListResponse> {
   try {
-    const data = await getNucleusListAPI();
+    const data = await getNucleusListAPI(endpoint);
     
     return {
       success: true,
@@ -32,9 +33,9 @@ export async function getNucleusList(): Promise<NucleusListResponse> {
   }
 }
 
-export async function getNucleusDetail(id: string): Promise<APIResponse<NucleusInfo>> {
+export async function getNucleusDetail(endpoint: string, id: string): Promise<APIResponse<NucleusInfo>> {
   try {
-    const data = await getNucleusByIdAPI(id);
+    const data = await getNucleusByIdAPI(endpoint, id);
     
     return {
       success: true,
@@ -49,13 +50,13 @@ export async function getNucleusDetail(id: string): Promise<APIResponse<NucleusI
   }
 }
 
-export async function getNodeDetail(): Promise<{
+export async function getNodeDetail(endpoint: string): Promise<{
   success: boolean;
   data?: NodeDetail;
   message?: string;
 }> {
   try {
-    const data = await getNodeDetailAPI();
+    const data = await getNodeDetailAPI(endpoint);
     
     return {
       success: true,
@@ -70,9 +71,9 @@ export async function getNodeDetail(): Promise<{
   }
 }
 
-export async function getNucleusAbi(id: string): Promise<any> {
+export async function getNucleusAbi(rpcUrl: string): Promise<any> {
   try {
-    const data = await getNucleusAbiAPI(id);
+    const data = await getNucleusAbiAPI(rpcUrl);
     return {
       success: true,
       data,
@@ -94,9 +95,9 @@ export type AgentInfo = {
 
 export type AgentListResponse = APIResponse<AgentInfo[]>;
 
-export async function getAgentList(): Promise<AgentListResponse> {
+export async function getAgentList(endpoint: string): Promise<AgentListResponse> {
   try {
-    const data = await getAgentListAPI();
+    const data = await getAgentListAPI(endpoint);
     return {
       success: true,
       data: data as unknown as AgentInfo[],
@@ -110,9 +111,9 @@ export async function getAgentList(): Promise<AgentListResponse> {
   }
 }
 
-export async function getAgentById(agentId: string): Promise<APIResponse<AgentInfo>> {
+export async function getAgentById(endpoint: string, agentId: string): Promise<APIResponse<AgentInfo>> {
   try {
-    const data = await getAgentByIdAPI(agentId);
+    const data = await getAgentByIdAPI(endpoint, agentId);
     return {
       success: true,
       data: data as unknown as AgentInfo,

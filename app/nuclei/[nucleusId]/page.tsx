@@ -1,3 +1,5 @@
+"use client";
+
 import { getNucleusDetail } from "@/app/actions";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
@@ -8,6 +10,10 @@ import { notFound } from "next/navigation";
 import NucleusCard from "@/components/home/components/NucleusCard";
 import AbiDetails from "@/components/nucleus/abi/AbiDetails";
 import OpenLogs from "@/components/nucleus/OpenLogs";
+import { use, useEffect, useState } from "react";
+import { NucleusInfo } from "@/types/nucleus";
+import { useEndpointStore } from "@/stores/endpoint";
+import { Spinner } from "@heroui/react";
 
 interface NucleusDetailPageProps {
   params: Promise<{
@@ -15,41 +21,36 @@ interface NucleusDetailPageProps {
   }>;
 }
 
-export async function generateMetadata({ params }: NucleusDetailPageProps): Promise<Metadata> {
-  const { nucleusId } = await params;
+export default function NucleusDetailPage({ params }: NucleusDetailPageProps) {
+  const { nucleusId } = use(params);
 
-  const result = await getNucleusDetail(nucleusId);
+  const { endpoint } = useEndpointStore();
 
-  if (!result.success || !result.data) {
-    return {
-      title: "Nucleus Not Found",
-      description: "The requested Nucleus does not exist or has been deleted",
+  const [nuclei, setNuclei] = useState<NucleusInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchNucleusDetail = async () => {
+      setIsLoading(true);
+      const result = await getNucleusDetail(endpoint, nucleusId);
+      if (!result.success || !result.data) {
+        setError(result.message || "Unknown error");
+      } else {
+        setNuclei(result.data);
+      }
+      setIsLoading(false);
     };
+
+    fetchNucleusDetail();
+  }, [endpoint, nucleusId]);
+
+
+  if (error?.includes("404") || error?.includes("not found")) {
+    notFound();
   }
 
-  const nucleus = result.data;
-
-  return {
-    title: `${nucleus.name} - Nucleus Detail`,
-    description: `View the detailed information of ${nucleus.name}, including manager, capacity, energy, and other core data.`,
-    openGraph: {
-      title: `${nucleus.name} - Nucleus Detail`,
-      description: `View the detailed information of ${nucleus.name}, including manager, capacity, energy, and other core data.`,
-      type: "website",
-    },
-  };
-}
-
-export default async function NucleusDetailPage({ params }: NucleusDetailPageProps) {
-  const { nucleusId } = await params;
-
-  const result = await getNucleusDetail(nucleusId);
-
-  if (!result.success || !result.data) {
-    if (result.message?.includes("404") || result.message?.includes("not found")) {
-      notFound();
-    }
-
+  if (error) {
     return (
       <div className="w-full mx-auto py-4">
         <div className="mb-6">
@@ -62,14 +63,12 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
 
         <Card>
           <CardBody>
-            <p className="text-danger">Load data failed: {result.message || "Unknown error"}</p>
+            <p className="text-danger">Load data failed: {error}</p>
           </CardBody>
         </Card>
       </div>
     );
   }
-
-  const nucleus = result.data;
 
   return (
     <div className="w-full mx-auto py-4 space-y-6">
@@ -82,9 +81,17 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
         <OpenLogs nucleusId={nucleusId} />
       </div>
 
-      <NucleusCard nucleus={nucleus} showLink={false} />
+      {isLoading && (
+        <div className="w-full mx-auto py-4">
+          <div className="flex justify-center items-center h-full">
+            <Spinner size="lg" />
+          </div>
+        </div>
+      )}
 
-      <div className="space-y-4">
+      {nuclei && <NucleusCard nucleus={nuclei} showLink={false} />}
+
+      {nuclei && <div className="space-y-4">
         <h2 className="text-xl font-semibold">Detailed Information</h2>
         <Card>
           <CardBody>
@@ -92,34 +99,34 @@ export default async function NucleusDetailPage({ params }: NucleusDetailPagePro
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">Root State</h3>
-                  <p className="text-sm font-mono break-all">{nucleus.rootState}</p>
+                  <p className="text-sm font-mono break-all">{nuclei?.rootState}</p>
                 </div>
 
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">ID</h3>
-                  <p className="text-sm font-mono break-all">{nucleus.id}</p>
+                  <p className="text-sm font-mono break-all">{nuclei?.id}</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">WASM Hash</h3>
-                  <p className="text-sm font-mono break-all">{nucleus.wasmHash}</p>
+                  <p className="text-sm font-mono break-all">{nuclei?.wasmHash}</p>
                 </div>
 
                 <div>
                   <h3 className="text-sm font-medium text-default-500 mb-1">Manager</h3>
-                  <p className="text-sm font-mono break-all">{nucleus.manager}</p>
+                  <p className="text-sm font-mono break-all">{nuclei?.manager}</p>
                 </div>
               </div>
             </div>
           </CardBody>
         </Card>
-      </div>
-      <div className="space-y-4">
+      </div>}
+      {nuclei && <div className="space-y-4">
         <h2 className="text-xl font-semibold">ABI Explorer</h2>
-        <AbiDetails nucleus={nucleus} />
-      </div>
+        <AbiDetails nucleus={nuclei} />
+      </div>}
     </div>
   );
 }

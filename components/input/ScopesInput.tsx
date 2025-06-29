@@ -18,12 +18,14 @@ export const ScopesInput = ({
   label = "Scopes",
   isRequired = false,
   description,
+  isDisabled = false,
 }: {
   name: string;
   control: Control<any>;
   label?: string;
   isRequired?: boolean;
   description?: string;
+  isDisabled?: boolean;
 }) => {
   return (
     <div className="space-y-4">
@@ -54,6 +56,7 @@ export const ScopesInput = ({
                   { name: '', description: '' }
                 ]);
               }}
+              isDisabled={isDisabled}
             >
               Add Scope
             </Button>
@@ -98,6 +101,7 @@ export const ScopesInput = ({
                       base: "flex-1"
                     }}
                     isInvalid={!!error}
+                    isReadOnly={isDisabled}
                   />
                   <Input
                     placeholder="Description (e.g., read access)"
@@ -114,6 +118,7 @@ export const ScopesInput = ({
                     classNames={{
                       base: "flex-2"
                     }}
+                    isReadOnly={isDisabled}
                   />
                   <Button
                     type="button"
@@ -126,6 +131,7 @@ export const ScopesInput = ({
                       updatedScopes.splice(index, 1);
                       field.onChange(updatedScopes);
                     }}
+                    isDisabled={isDisabled}
                   >
                     <Trash2 size={14} />
                   </Button>

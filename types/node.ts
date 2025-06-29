@@ -15,5 +15,4 @@ export interface NetworkStats {
 export interface NodeDetail {
   nodeInfo: NodeInfo;
   networkStats: NetworkStats;
-  endpoint: string;
 } 

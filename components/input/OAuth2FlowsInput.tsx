@@ -17,6 +17,7 @@ interface OAuth2FlowsInputProps {
   control: Control<any>;
   label?: string;
   isRequired?: boolean;
+  isDisabled?: boolean;
 }
 
 const FLOW_PRESETS = {
@@ -47,6 +48,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
   control,
   label = "OAuth2 Flow Configuration",
   isRequired = false,
+  isDisabled = false,
 }) => {
   const [selectedPreset, setSelectedPreset] = React.useState<string>('standard');
   const [customFlows, setCustomFlows] = React.useState<OAuth2FlowType>({
@@ -83,6 +85,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
           setSelectedPreset(preset);
         }}
         description="Select a recommended configuration based on your application type"
+        isDisabled={isDisabled}
       >
         {Object.entries(FLOW_PRESETS).map(([key, preset]) => (
           <SelectItem key={key} description={preset.description}>
@@ -106,6 +109,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               }}
               isDisabled={selectedPreset !== 'custom'}
               color="primary"
+              isReadOnly={isDisabled}
             >
               <div>
                 <div className="font-medium text-sm">Authorization Code Flow</div>
@@ -124,6 +128,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               }}
               isDisabled={selectedPreset !== 'custom'}
               color="primary"
+              isReadOnly={isDisabled}
             >
               <div>
                 <div className="font-medium text-sm">Client Credentials Flow</div>
@@ -142,6 +147,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               }}
               isDisabled={selectedPreset !== 'custom'}
               color="warning"
+              isReadOnly={isDisabled}
             >
               <div>
                 <div className="font-medium text-sm">Implicit Flow <span className="text-warning">(Not Recommended)</span></div>
@@ -160,6 +166,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               }}
               isDisabled={selectedPreset !== 'custom'}
               color="warning"
+              isReadOnly={isDisabled}
             >
               <div>
                 <div className="font-medium text-sm">Resource Owner Password Flow <span className="text-warning">(Not Recommended)</span></div>
@@ -203,6 +210,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
                   errorMessage={error?.message}
                   isRequired={customFlows.authorizationCode}
                   description="Endpoint URL for user authorization"
+                  isReadOnly={isDisabled}
                 />
               )}
             />
@@ -226,6 +234,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
                   errorMessage={error?.message}
                   isRequired={customFlows.authorizationCode}
                   description="Endpoint URL for obtaining access token"
+                  isReadOnly={isDisabled}
                 />
               )}
             />
@@ -247,6 +256,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
                   isInvalid={!!error}
                   errorMessage={error?.message}
                   description="Endpoint URL for refreshing token"
+                  isReadOnly={isDisabled}
                 />
               )}
             />
@@ -256,6 +266,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               control={control}
               label="Authorization Code Scopes"
               description="Define the scopes supported by this flow"
+              isDisabled={isDisabled}
             />
           </div>
         </Card>
@@ -286,6 +297,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
                   errorMessage={error?.message}
                   isRequired={customFlows.clientCredentials}
                   description="Endpoint URL for obtaining access token"
+                  isReadOnly={isDisabled}
                 />
               )}
             />
@@ -307,6 +319,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
                   isInvalid={!!error}
                   errorMessage={error?.message}
                   description="Endpoint URL for refreshing token"
+                  isReadOnly={isDisabled}
                 />
               )}
             />
@@ -316,6 +329,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               control={control}
               label="Client Credentials Scopes"
               description="Define the scopes supported by this flow"
+              isDisabled={isDisabled}
             />
           </div>
         </Card>
@@ -352,6 +366,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
                   isInvalid={!!error}
                   errorMessage={error?.message}
                   isRequired={customFlows.implicit}
+                  isReadOnly={isDisabled}
                 />
               )}
             />
@@ -360,6 +375,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               name={`${name}.flows.implicit.scopesArray`}
               control={control}
               label="Implicit Scopes"
+              isDisabled={isDisabled}
             />
           </div>
         </Card>
@@ -396,6 +412,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
                   isInvalid={!!error}
                   errorMessage={error?.message}
                   isRequired={customFlows.password}
+                  isReadOnly={isDisabled}
                 />
               )}
             />
@@ -404,6 +421,7 @@ export const OAuth2FlowsInput: React.FC<OAuth2FlowsInputProps> = ({
               name={`${name}.flows.password.scopesArray`}
               control={control}
               label="Password Scopes"
+              isDisabled={isDisabled}
             />
           </div>
         </Card>

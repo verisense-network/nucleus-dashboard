@@ -1,9 +1,8 @@
-import { ENDPOINT } from "@/config/endpoint";
 import { RequestManager, Client, HTTPTransport, WebSocketTransport } from "@open-rpc/client-js";
 
-export async function getRpcClient(endpoint?: string) {
+export async function getRpcClient(endpoint: string) {
   const isHttpEndpoint = endpoint?.startsWith("http");
-  const url = endpoint || ENDPOINT;
+  const url = endpoint;
   let client: Client;
 
   if (isHttpEndpoint) {

@@ -1,29 +1,70 @@
+"use client";
+
 import { Card, CardBody } from "@heroui/card";
 import AgentCard from "./components/AgentCard";
 import { Button } from "@heroui/button";
 import Link from "next/link";
-import { getAgentList } from "@/app/actions";
+import { AgentInfo, getAgentList } from "@/app/actions";
+import { useEffect, useState } from "react";
+import { useEndpointStore } from "@/stores/endpoint";
+import { Spinner } from "@heroui/react";
 
 export const ListboxWrapper = ({ children }: { children: React.ReactNode }) => (
   <div className="w-full px-1 py-2 rounded-small">{children}</div>
 );
 
-export default async function AgentList() {
-  const result = await getAgentList();
+export default function AgentList() {
+  const { endpoint, status: endpointStatus } = useEndpointStore();
+  const [agentList, setAgentList] = useState<AgentInfo[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  if (!result.success || !result.data) {
+  useEffect(() => {
+    const fetchAgentList = async () => {
+      if (endpointStatus !== "connected") {
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const result = await getAgentList(endpoint);
+
+        if (!result.success) {
+          setError(result.message || "Unknown error");
+          return;
+        }
+
+        if (result.data) {
+          setAgentList(result.data);
+        }
+      } catch (error) {
+        console.error(error);
+        setError(error instanceof Error ? error.message : "Unknown error");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAgentList();
+  }, [endpoint, endpointStatus]);
+
+  if (endpointStatus === "connecting") {
+    return (
+      <div className="w-full mx-auto">
+      </div>
+    );
+  }
+
+  if (error) {
     return (
       <div className="w-full mx-auto">
         <Card>
           <CardBody>
-            <p className="text-danger">Load data failed: {result.message || "Unknown error"}</p>
+            <p className="text-danger">Load data failed: {error}</p>
           </CardBody>
         </Card>
       </div>
     );
   }
-
-  const agentList = result.data;
 
   return (
     <>
@@ -34,7 +75,11 @@ export default async function AgentList() {
         </Button>
       </div>
       <div className="w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-        {agentList.length === 0 ? (
+        {isLoading ? (
+          <div className="w-full mx-auto">
+            <Spinner />
+          </div>
+        ) : agentList.length === 0 ? (
           <Card>
             <CardBody>
               <p className="text-default-500 text-center">No Agent data</p>

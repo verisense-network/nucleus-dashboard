@@ -1,3 +1,5 @@
+"use client";
+
 import { AgentInfo, getAgentById } from "@/app/actions";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
@@ -5,14 +7,18 @@ import { Chip } from "@heroui/chip";
 import { Divider } from "@heroui/divider";
 import { Avatar } from "@heroui/avatar";
 import { ArrowLeft, Shield, Zap, FileText, ExternalLink, Key, Lock, CircleHelp } from "lucide-react";
-import { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { SecurityScheme, OAuth2SecurityScheme, APIKeySecurityScheme, HTTPAuthSecurityScheme, OpenIdConnectSecurityScheme } from "../../../types/a2a";
+import { useRouter } from "next/navigation";
+import { SecurityScheme, OAuth2SecurityScheme, APIKeySecurityScheme, HTTPAuthSecurityScheme, OpenIdConnectSecurityScheme, AgentCard } from "../../../types/a2a";
 import { Tooltip } from "@heroui/tooltip";
 import { User } from "@heroui/user";
 import { AddressViewFormat } from "@/utils/format";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
+import { use, useEffect, useState } from "react";
+import { useEndpointStore } from "@/stores/endpoint";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
+import { toast } from "react-toastify";
+import { deleteAgent } from "@/api/rpc";
 
 interface AgentDetailPageProps {
   params: Promise<{
@@ -20,41 +26,59 @@ interface AgentDetailPageProps {
   }>;
 }
 
-export async function generateMetadata({ params }: AgentDetailPageProps): Promise<Metadata> {
-  const { agentId } = await params;
+export default function AgentDetailPage({ params }: AgentDetailPageProps) {
+  const { agentId } = use(params);
+  const { endpoint } = useEndpointStore();
+  const router = useRouter();
 
-  const result = await getAgentById(agentId);
+  const [agent, setAgent] = useState<AgentInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [balance, setBalance] = useState<{ balance: string; symbol: string } | null>(null);
+  const { getBalanceByAddress } = usePolkadotWalletStore();
+  const [isOpenDeleteAgentCard, setIsOpenDeleteAgentCard] = useState(false);
 
-  if (!result.success || !result.data) {
-    return {
-      title: "Agent Not Found",
-      description: "The requested Agent does not exist or has been deleted",
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const fetchAgent = async () => {
+      try {
+        setIsLoading(true);
+        const result = await getAgentById(endpoint, agentId);
+        if (result.success && result.data) {
+          setAgent(result.data);
+        }
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "Unknown error");
+      } finally {
+        setIsLoading(false);
+      }
     };
+    fetchAgent();
+  }, [endpoint, agentId]);
+
+  useEffect(() => {
+    if (agent) {
+      const fetchBalance = async () => {
+        const balance = await getBalanceByAddress(agent.ownerId);
+        setBalance(balance);
+      };
+      fetchBalance();
+    }
+  }, [agent, getBalanceByAddress]);
+
+
+  if (isLoading) {
+    return (
+      <div className="w-full mx-auto py-4">
+        <div className="flex justify-center items-center h-full">
+          <Spinner size="lg" />
+        </div>
+      </div>
+    );
   }
 
-  const agent = result.data;
-
-  return {
-    title: `${agent.agentCard.name} - Agent Detail`,
-    description: `View the detailed information of ${agent.agentCard.name}, including version, description, and other core data.`,
-    openGraph: {
-      title: `${agent.agentCard.name} - Agent Detail`,
-      description: `View the detailed information of ${agent.agentCard.name}, including version, description, and other core data.`,
-      type: "website",
-    },
-  };
-}
-
-export default async function AgentDetailPage({ params }: AgentDetailPageProps) {
-  const { agentId } = await params;
-
-  const result = await getAgentById(agentId);
-
-  if (!result.success || !result.data) {
-    if (!result.data && !result.message) {
-      notFound();
-    }
-
+  if (error) {
     return (
       <div className="w-full mx-auto py-4">
         <div className="mb-6">
@@ -67,14 +91,12 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
 
         <Card>
           <CardBody>
-            <p className="text-danger">Failed to load data: {result.message || "Unknown error"}</p>
+            <p className="text-danger">Failed to load data: {error}</p>
           </CardBody>
         </Card>
       </div>
     );
   }
-
-  const agent = result.data;
 
   function parseAgentCard(agent: AgentInfo) {
     return {
@@ -85,7 +107,7 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
     };
   }
 
-  const agentCard = parseAgentCard(agent);
+  const agentCard: AgentCard | null = agent && parseAgentCard(agent);
 
   const renderSecurityScheme = (schemeName: string, scheme: SecurityScheme) => {
     const getSchemeIcon = (type: string) => {
@@ -218,8 +240,30 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
     );
   };
 
-  const { getBalanceByAddress } = usePolkadotWalletStore.getInitialState();
-  const balance = await getBalanceByAddress(agent.ownerId);
+  const onDeleteAgentCard = async () => {
+    setIsDeleting(true);
+    const toastId = toast.loading('Deleting agent card...');
+    try {
+      const res = await deleteAgent(endpoint, agentId, toastId);
+      toast.update(toastId, {
+        type: 'success',
+        render: `Agent card deleted! Transaction finalized: ${res.slice(0, 10)}...`,
+        isLoading: false,
+      });
+      router.push("/");
+      setIsOpenDeleteAgentCard(false);
+    } catch (error) {
+      console.error(error);
+      toast.update(toastId, {
+        type: 'error',
+        render: error instanceof Error ? error.message : "Unknown error",
+        isLoading: false,
+      });
+    } finally {
+      setIsDeleting(false);
+      toast.dismiss();
+    }
+  }
 
   return (
     <div className="w-full mx-auto py-4 space-y-6">
@@ -235,7 +279,7 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
         <h1 className="text-2xl font-bold mb-2">Agent Details</h1>
       </div>
 
-      <Card>
+      {agentCard && <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3 w-full">
             <div className="flex items-center gap-3">
@@ -247,18 +291,26 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
                 <p className="text-small text-default-500">Version {agentCard.version}</p>
               </div>
             </div>
-            <div>
+            <div className="flex flex-col md:flex-row items-center gap-2">
               <User
                 name="Owner"
                 description={
-                  <div className="flex flex-col gap-2">
-                    <AddressViewFormat address={agent.ownerId} bracket={false} />
+                  <div className="flex flex-col">
+                    <AddressViewFormat address={agent?.ownerId || ""} bracket={false} />
                     <div className="text-zinc-400 text-sm">
-                      balance: {balance.balance} {balance.symbol}
+                      balance: {balance?.balance} {balance?.symbol}
                     </div>
                   </div>
                 }
               />
+              <Button color="primary" onPress={() => {
+                router.push(`/register/agent?agentCardId=${agentId}`);
+              }}>
+                Update
+              </Button>
+              <Button color="danger" onPress={() => setIsOpenDeleteAgentCard(true)}>
+                Delete
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -293,9 +345,9 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
             </div>
           </div>
         </CardBody>
-      </Card>
+      </Card>}
 
-      <Card>
+      {agentCard && <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-warning" />
@@ -406,9 +458,9 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
             </div>
           )}
         </CardBody>
-      </Card>
+      </Card>}
 
-      <Card>
+      {agentCard && <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
@@ -439,9 +491,9 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
             </div>
           </div>
         </CardBody>
-      </Card>
+      </Card>}
 
-      <Card>
+      {agentCard && <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-success" />
@@ -472,9 +524,9 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
             </div>
           </div>
         </CardBody>
-      </Card>
+      </Card>}
 
-      <Card>
+      {agentCard && <Card>
         <CardHeader>
           <h3 className="text-lg font-semibold">Skills</h3>
         </CardHeader>
@@ -518,9 +570,9 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
             ))}
           </div>
         </CardBody>
-      </Card>
+      </Card>}
 
-      <Card>
+      {agentCard && <Card>
         <CardHeader>
           <h3 className="text-lg font-semibold">Configuration</h3>
         </CardHeader>
@@ -536,7 +588,21 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
             </Chip>
           </div>
         </CardBody>
-      </Card>
+      </Card>}
+
+      <Modal isOpen={isOpenDeleteAgentCard} onOpenChange={setIsOpenDeleteAgentCard}>
+        <ModalContent>
+          <ModalHeader>
+            <h3 className="text-lg font-semold">Delete Agent Card</h3>
+          </ModalHeader>
+          <ModalBody>
+            <p>Are you sure you want to delete this agent card?</p>
+          </ModalBody>
+          <ModalFooter>
+            <Button color="danger" onPress={() => onDeleteAgentCard()} isLoading={isDeleting}>Delete</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
