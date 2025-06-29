@@ -1,22 +1,20 @@
 'use client';
 
 import AgentRegistrationForm from "@/components/agent/AgentRegistrationForm";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { AgentCard } from "@/types/a2a";
 import { toast } from "react-toastify";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { invalidateCache } from "@/app/actions";
 import { useEndpointStore } from "@/stores/endpoint";
-import { useSearchParams } from "next/navigation";
 import { registerAgent } from "@/api/rpc";
+import { Spinner } from "@heroui/react";
 
 export default function AgentRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { endpoint } = useEndpointStore();
-  const searchParams = useSearchParams();
-  const agentCardId = searchParams.get('agentCardId');
 
-  const handleSubmit = async (data: AgentCard) => {
+  const handleSubmit = async (data: AgentCard, updateAgentId?: string | null) => {
     setIsLoading(true);
     const toastId = toast.loading('Continue in your wallet...');
     console.log('data', data);
@@ -34,7 +32,7 @@ export default function AgentRegistrationPage() {
         return;
       }
 
-      const resFinalizedHash = await registerAgent(endpoint, data, toastId, agentCardId);
+      const resFinalizedHash = await registerAgent(endpoint, data, toastId, updateAgentId);
 
       toast.update(toastId, {
         type: 'success',
@@ -60,13 +58,14 @@ export default function AgentRegistrationPage() {
   };
 
   return (
-    <div className="w-full mx-auto py-4 space-y-6">
-      <h1 className="text-2xl font-bold">Register Agent</h1>
-      <AgentRegistrationForm
-        onSubmit={handleSubmit}
-        isLoading={isLoading}
-        agentCardId={agentCardId}
-      />
-    </div>
+    <Suspense fallback={<Spinner size="lg" />}>
+      <div className="w-full mx-auto py-4 space-y-6">
+        <h1 className="text-2xl font-bold">Register Agent</h1>
+        <AgentRegistrationForm
+          onSubmit={handleSubmit}
+          isLoading={isLoading}
+        />
+      </div>
+    </Suspense>
   );
 }

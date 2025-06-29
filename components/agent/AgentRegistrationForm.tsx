@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { getAgentById } from '@/app/actions';
 import { useEndpointStore } from '@/stores/endpoint';
 import { toast } from 'react-toastify';
+import { useSearchParams } from 'next/navigation';
 
 
 interface SecuritySchemeFormData {
@@ -36,9 +37,8 @@ interface FormData extends Omit<AgentCard, 'securitySchemes' | 'security'> {
 }
 
 interface AgentRegistrationFormProps {
-  onSubmit: (data: AgentCard) => Promise<void>;
+  onSubmit: (data: AgentCard, updateAgentId?: string | null) => Promise<void>;
   isLoading?: boolean;
-  agentCardId?: string | null;
 }
 
 const testData = {
@@ -109,7 +109,6 @@ const testData = {
 export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   onSubmit,
   isLoading = false,
-  agentCardId = ''
 }) => {
   const [isOpenForm, setIsOpenForm] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
@@ -117,6 +116,8 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   const [endpointUrl, setEndpointUrl] = useState('');
   const [endpointUrlError, setEndpointUrlError] = useState('');
   const [isLoadingAgentCard, setIsLoadingAgentCard] = useState(false);
+  const searchParams = useSearchParams();
+  const agentCardId = searchParams.get('agentCardId');
   const { endpoint } = useEndpointStore();
 
   const {
@@ -272,7 +273,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       }
     };
 
-    await onSubmit(agentCardData);
+    await onSubmit(agentCardData, agentCardId);
     reset();
   };
 
