@@ -76,8 +76,8 @@ export default function Header() {
                 <Settings className="w-4 h-4" />
               </Button>
             </span>
-            <span className="text-xs md:text-sm text-foreground">
-              {endpoint ? <AddressViewFormat address={endpoint} bracket={false} /> : "No endpoint"}
+            <span className="text-xs hidden md:block text-foreground">
+              {endpoint || "No endpoint"}
             </span>
           </div>
           <WalletStatus />

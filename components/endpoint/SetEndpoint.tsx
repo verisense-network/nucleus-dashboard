@@ -28,9 +28,6 @@ export default function SetEndpoint({ onClose }: { onClose: () => void }) {
               if (!value.startsWith("ws") && !value.startsWith("wss")) {
                 return "Endpoint must start with ws or wss";
               }
-              if (endpoints.includes(value)) {
-                return "Endpoint already exists";
-              }
               return true;
             }}
             placeholder="wss://rpc.beta.verisense.network"

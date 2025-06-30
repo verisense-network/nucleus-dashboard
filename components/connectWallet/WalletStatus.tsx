@@ -10,9 +10,10 @@ import { Dropdown } from "@heroui/dropdown";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { Wallet } from "lucide-react";
 import { toast } from "react-toastify";
+import { formatAddress } from "@/utils/tools";
 
 export function WalletStatus() {
-  const { isConnected, selectedAccount, connectWallet, isConnecting, disconnectWallet, balance, symbol, updateBalance } = usePolkadotWalletStore();
+  const { isConnected, selectedAccount, isConnecting, disconnectWallet, connectWallet, balance, symbol, updateBalance } = usePolkadotWalletStore();
 
   const formattedBalance = useMemo(() => {
     return `${balance} ${symbol}`;
@@ -27,9 +28,9 @@ export function WalletStatus() {
   if (!isConnected) {
     return (
       <Button
-        variant="bordered"
+        variant="faded"
         startContent={<Wallet className="w-4 h-4" />}
-        onPress={connectWallet}
+        onPress={() => connectWallet()}
         isLoading={isConnecting}
       >
         {isConnecting ? "Connecting..." : "Connect"}
@@ -41,25 +42,22 @@ export function WalletStatus() {
     return null;
   }
 
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
   const copyAddress = (address: string) => {
     navigator.clipboard.writeText(address);
     toast.success("Copied to clipboard");
   };
 
-  const handleDisconnect = () => {
-    disconnectWallet();
+  const handleDisconnect = async () => {
+    await disconnectWallet();
   };
 
-  const handleAction = (key: Key) => {
-    updateBalance();
-    if (key === "copy-address") {
+  const handleAction = async (key: Key) => {
+    if (key === "refresh-balance") {
+      updateBalance();
+    } else if (key === "copy-address") {
       copyAddress(selectedAccount.address);
     } else if (key === "disconnect") {
-      handleDisconnect();
+      await handleDisconnect();
     }
   };
 
@@ -72,17 +70,21 @@ export function WalletStatus() {
             description={formatAddress(selectedAccount.address)}
             avatarProps={{
               name: selectedAccount.meta.name || "Wallet",
+              color: "primary",
             }}
           />
         </DropdownTrigger>
         <DropdownMenu aria-label="Wallet Actions" onAction={handleAction}>
-          <DropdownItem key="balance">
-            {formattedBalance}
+          <DropdownItem key="balance" isReadOnly>
+            Balance: {formattedBalance}
+          </DropdownItem>
+          <DropdownItem key="refresh-balance">
+            Refresh Balance
           </DropdownItem>
           <DropdownItem key="copy-address">
             Copy Address
           </DropdownItem>
-          <DropdownItem key="disconnect">
+          <DropdownItem key="disconnect" color="danger">
             Disconnect
           </DropdownItem>
         </DropdownMenu>
