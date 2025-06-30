@@ -16,6 +16,8 @@ import { ApiPromise } from "@polkadot/api";
 import { u8aToHex } from "@polkadot/util";
 import { generateCode } from "./generator";
 import { useHydrationEndpointStore } from "@/stores/endpoint";
+import { wrapApiRequest } from "@/utils/api";
+import { getNucleusAbiAPI } from "@/api/nucleus";
 
 interface AbiDetailsProps {
   nucleus: NucleusInfo;
@@ -27,7 +29,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
   const [tsCode, setTsCode] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("types");
-  const [{ endpoint }, hydrated] = useHydrationEndpointStore(state => state);
+  const [{ endpoint, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
 
 
   const loadAbiData = useCallback(async () => {
@@ -37,7 +39,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     setError(null);
     try {
       const rpcUrl = `${endpoint}/${nucleus.id}`;
-      const { success, data } = await getNucleusAbi(rpcUrl);
+      const { success, data } = await wrapApiRequest(getNucleusAbi.bind(null, rpcUrl), getNucleusAbiAPI.bind(null, rpcUrl), isLocalNode(endpoint));
       if (!success) {
         throw new Error(data || "Failed to load ABI");
       }
