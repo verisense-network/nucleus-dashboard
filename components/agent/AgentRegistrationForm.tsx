@@ -116,6 +116,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   const [endpointUrl, setEndpointUrl] = useState('');
   const [endpointUrlError, setEndpointUrlError] = useState('');
   const [isLoadingAgentCard, setIsLoadingAgentCard] = useState(false);
+  const [isLoadedAgentCard, setIsLoadedAgentCard] = useState(false);
   const searchParams = useSearchParams();
   const agentCardId = searchParams.get('agentCardId');
   const { endpoint } = useEndpointStore();
@@ -385,10 +386,12 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   };
 
   const loadAgentCardFromEndpoint = useCallback(async () => {
-    if (!endpointUrl.trim()) {
+    if (!endpointUrl) {
       setEndpointUrlError('Please enter a valid endpoint address');
       return;
     }
+
+    toast.loading('Loading agent card...');
 
     setIsLoadingAgentCard(true);
     try {
@@ -402,6 +405,8 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
 
       const data = await response.json();
       parseJsonData(JSON.stringify(data));
+
+      setIsLoadedAgentCard(true);
       setIsOpenForm(true);
     } catch (error) {
       console.error('Error loading agent card:', error);
@@ -409,12 +414,14 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       setEndpointUrlError(`Failed to load: ${errorMessage}`);
     } finally {
       setIsLoadingAgentCard(false);
+      toast.dismiss();
     }
   }, [endpointUrl, parseJsonData]);
 
   useEffect(() => {
+    if (!agentCardId || isLoadedAgentCard) return;
+
     const fetchAgentCard = async () => {
-      toast.loading('Loading agent card...');
       if (agentCardId && endpoint) {
         const agentCard = await getAgentById(endpoint, agentCardId);
         if (agentCard.success) {
@@ -425,10 +432,9 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
           }
         }
       }
-      toast.dismiss();
     }
     fetchAgentCard();
-  }, [agentCardId, endpoint, loadAgentCardFromEndpoint]);
+  }, [agentCardId, endpoint, loadAgentCardFromEndpoint, isLoadedAgentCard]);
 
   return (
     <div className="mx-auto space-y-6">
@@ -468,7 +474,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                 variant="flat"
                 onPress={loadAgentCardFromEndpoint}
                 isLoading={isLoadingAgentCard}
-                disabled={isLoadingAgentCard || !endpointUrl.trim()}
+                isDisabled={isLoadingAgentCard || !endpointUrl.trim()}
               >
                 {isLoadingAgentCard ? 'Loading...' : 'Load Agent Card'}
               </Button>
