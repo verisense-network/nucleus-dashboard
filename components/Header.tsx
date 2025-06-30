@@ -4,20 +4,21 @@ import { WalletStatus } from "@/components/connectWallet";
 import Logo from "./icon/Logo";
 import { Divider } from "@heroui/divider";
 import Link from "next/link";
-import { useEndpointStore } from "@/stores/endpoint";
+import { useHydrationEndpointStore } from "@/stores/endpoint";
 import { Button, Modal, ModalBody, ModalContent, ModalHeader, Spinner } from "@heroui/react";
 import { CheckCircle, Settings, XCircle } from "lucide-react";
 import SetEndpoint from "./endpoint/SetEndpoint";
 import { useEffect, useState } from "react";
 import { getNodeDetail } from "@/app/actions";
-import { AddressViewFormat } from "@/utils/format";
 
 export default function Header() {
   const [isOpenSetEndpoint, setIsOpenSetEndpoint] = useState(false);
-  const { endpoint, status, setStatus, setEndpoint, endpoints } = useEndpointStore();
+  const [{ endpoint, status, setStatus, setEndpoint, endpoints}, hydrated] = useHydrationEndpointStore(state => state);
 
   useEffect(() => {
     const fetchNodeDetail = async () => {
+      if (!hydrated) return;
+
       if (!endpoint) {
         setStatus("disconnected");
         if (endpoints.length > 0) {
@@ -48,7 +49,7 @@ export default function Header() {
     return () => {
       setStatus("disconnected");
     }
-  }, [endpoint, endpoints, setEndpoint, setStatus]);
+  }, [endpoint, endpoints, setEndpoint, setStatus, hydrated]);
 
   return (
     <header className="fixed top-0 left-0 w-full h-16 border-b bg-white border-zinc-200 dark:bg-black dark:border-zinc-800 z-50">

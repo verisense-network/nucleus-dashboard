@@ -1,4 +1,8 @@
+"use client";
+
 import { ENDPOINT } from "@/config/endpoint";
+import { clearAllConnections } from "@/lib/polkadotApi";
+import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
@@ -21,10 +25,11 @@ export const useEndpointStore = create<Store>()(
       endpoints: [ENDPOINT],
       setEndpoint: (endpoint: string) => {
         const { endpoints } = get();
-
+        const newEndpoints = [endpoint, ...endpoints].filter((e, index, self) => self.indexOf(e) === index);
+        clearAllConnections();
         return set({
-          endpoint,
-          endpoints: [...new Set([endpoint, ...endpoints])],
+          endpoint: newEndpoints[0],
+          endpoints: newEndpoints,
           status: "connecting"
         })
       },
@@ -43,3 +48,15 @@ export const useEndpointStore = create<Store>()(
     { name: "endpoint", storage: createJSONStorage(() => localStorage) }
   )
 );
+
+export function useHydrationEndpointStore<T>(selector: (state: Store) => T): [T, boolean] {
+  const [hydrated, setHydrated] = useState(false)
+  
+  const value = useEndpointStore(selector) as T;
+  
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
+  
+  return [value, hydrated]
+}

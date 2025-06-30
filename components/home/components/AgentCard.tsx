@@ -12,7 +12,7 @@ interface AgentCardProps {
 export default function AgentCard({ agent, showLink = true }: AgentCardProps) {
   const agentCard = agent.agentCard;
   const CardContent = () => (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className="hover:shadow-lg transition-shadow h-full">
       <CardBody className="flex justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex justify-between items-center gap-2">
