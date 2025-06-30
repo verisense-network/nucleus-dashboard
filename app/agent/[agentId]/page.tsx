@@ -35,7 +35,7 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [balance, setBalance] = useState<{ balance: string; symbol: string } | null>(null);
-  const { getBalanceByAddress } = usePolkadotWalletStore();
+  const { getBalanceByAddress, selectedAddress } = usePolkadotWalletStore();
   const [isOpenDeleteAgentCard, setIsOpenDeleteAgentCard] = useState(false);
 
   const [isDeleting, setIsDeleting] = useState(false);
@@ -66,17 +66,6 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
       fetchBalance();
     }
   }, [agent, getBalanceByAddress]);
-
-
-  if (isLoading) {
-    return (
-      <div className="w-full mx-auto py-4">
-        <div className="flex justify-center items-center h-full">
-          <Spinner size="lg" />
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -275,321 +264,335 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
         </Link>
       </div>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Agent Details</h1>
-      </div>
+      {(isLoading || !agentCard) && (
+        <div className="w-full mx-auto py-4">
+          <div className="flex justify-center items-center h-full">
+            <Spinner size="lg" />
+          </div>
+        </div>
+      )}
 
-      {agentCard && <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3 w-full">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg flex items-center justify-center">
-                <Avatar src={agentCard.iconUrl} />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-semibold">{agentCard.name}</h2>
-                <p className="text-small text-default-500">Version {agentCard.version}</p>
-              </div>
-            </div>
-            <div className="flex flex-col md:flex-row items-center gap-2">
-              <User
-                name="Owner"
-                description={
-                  <div className="flex flex-col">
-                    <AddressViewFormat address={agent?.ownerId || ""} bracket={false} />
-                    <div className="text-zinc-400 text-sm">
-                      balance: {balance?.balance} {balance?.symbol}
-                    </div>
+      {agentCard && (
+        <>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold mb-2">Agent Details</h1>
+          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3 w-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+                    <Avatar src={agentCard.iconUrl} />
                   </div>
-                }
-              />
-              <Button color="primary" onPress={() => {
-                router.push(`/register/agent?agentCardId=${agentId}`);
-              }}>
-                Update
-              </Button>
-              <Button color="danger" onPress={() => setIsOpenDeleteAgentCard(true)}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardBody className="pt-0 space-y-4">
-          <p className="text-default-600">{agentCard.description}</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="font-medium mb-2">Service Provider</h4>
-              <div className="bg-default-50 rounded-lg p-3">
-                <p className="font-medium">{agentCard.provider?.organization}</p>
-                {agentCard.provider?.url && (
-                  <Link href={agentCard.provider.url} target="_blank" className="text-primary text-small flex items-center gap-1 mt-1">
-                    {agentCard.provider.url} <ExternalLink size={12} />
-                  </Link>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium mb-2">Links</h4>
-              <div className="space-y-2">
-                <Link href={agentCard.url} target="_blank" className="text-primary text-small flex items-center gap-1">
-                  Service URL({agentCard.url}) <ExternalLink size={12} />
-                </Link>
-                {agentCard.documentationUrl && (
-                  <Link href={agentCard.documentationUrl} target="_blank" className="text-primary text-small flex items-center gap-1">
-                    Documentation({agentCard.documentationUrl}) <ExternalLink size={12} />
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardBody>
-      </Card>}
-
-      {agentCard && <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-warning" />
-            <h3 className="text-lg font-semibold">Capabilities</h3>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
-              <span>SSE</span>
-              <Chip
-                color={agentCard.capabilities?.streaming ? "success" : "default"}
-                variant="flat"
-                size="sm"
-              >
-                {agentCard.capabilities.streaming ? "Supported" : "Not Supported"}
-              </Chip>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
-              <span>Push Notifications</span>
-              <Chip
-                color={agentCard.capabilities.pushNotifications ? "success" : "default"}
-                variant="flat"
-                size="sm"
-              >
-                {agentCard.capabilities.pushNotifications ? "Supported" : "Not Supported"}
-              </Chip>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
-              <span>Exposes task status<br />change history</span>
-              <Chip
-                color={agentCard.capabilities.stateTransitionHistory ? "success" : "default"}
-                variant="flat"
-                size="sm"
-              >
-                {agentCard.capabilities.stateTransitionHistory ? "Supported" : "Not Supported"}
-              </Chip>
-            </div>
-          </div>
-
-          {agentCard.capabilities.extensions && agentCard.capabilities.extensions.length > 0 && (
-            <div className="mt-6">
-              <h4 className="font-medium mb-3">Extensions</h4>
-              <div className="space-y-4">
-                {agentCard.capabilities.extensions.map((extension, index) => (
-                  <div key={index} className="bg-default-50 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Link href={extension.uri} target="_blank" className="text-primary text-small flex items-center gap-1">
-                            {extension.uri} <ExternalLink size={12} />
-                          </Link>
-                          <div className="flex items-center gap-1 ml-4">
-                            <Chip
-                              variant="flat"
-                              color={extension.required ? "warning" : "default"}
-                              size="sm"
-                            >
-                              {extension.required ? "Required" : "Optional"}
-                            </Chip>
-                            <Tooltip content="Whether the client must follow specific requirements of the extension.">
-                              <CircleHelp size={18} className="text-default-500" />
-                            </Tooltip>
-                          </div>
-                        </div>
-                        {extension.description && (
-                          <p className="text-small text-default-600">{extension.description}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {extension.params && (
-                      <div>
-                        <h5 className="font-medium mb-2">Parameters</h5>
-                        <div className="bg-default-100 rounded-lg p-3">
-                          {(() => {
-                            const params = typeof extension.params === 'string'
-                              ? JSON.parse(extension.params)
-                              : extension.params;
-
-                            return (
-                              <div className="space-y-2">
-                                {Object.entries(params).map(([key, value]) => (
-                                  <div key={key} className="flex items-start gap-2">
-                                    <div className="min-w-[120px]">
-                                      <Chip variant="flat" color="primary" size="sm" className="w-full justify-center">
-                                        {key}
-                                      </Chip>
-                                    </div>
-                                    <div className="flex-1">
-                                      <Chip variant="flat" color="secondary" size="sm" className="w-full">
-                                        {String(value)}
-                                      </Chip>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
+                  <div className="flex-1">
+                    <h2 className="text-xl font-semibold">{agentCard.name}</h2>
+                    <p className="text-small text-default-500">Version {agentCard.version}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col md:flex-row items-center gap-2">
+                  <User
+                    name="Owner"
+                    description={
+                      <div className="flex flex-col">
+                        <AddressViewFormat address={agent?.ownerId || ""} bracket={false} />
+                        <div className="text-zinc-400 text-sm">
+                          balance: {balance?.balance} {balance?.symbol}
                         </div>
                       </div>
+                    }
+                  />
+                  {agent?.ownerId === selectedAddress && (
+                    <>
+                      <Button color="primary" onPress={() => {
+                        router.push(`/register/agent?agentCardId=${agentId}`);
+                      }}>
+                        Update
+                      </Button>
+                      <Button color="danger" onPress={() => setIsOpenDeleteAgentCard(true)}>
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardBody className="pt-0 space-y-4">
+              <p className="text-default-600">{agentCard.description}</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium mb-2">Service Provider</h4>
+                  <div className="bg-default-50 rounded-lg p-3">
+                    <p className="font-medium">{agentCard.provider?.organization}</p>
+                    {agentCard.provider?.url && (
+                      <Link href={agentCard.provider.url} target="_blank" className="text-primary text-small flex items-center gap-1 mt-1">
+                        {agentCard.provider.url} <ExternalLink size={12} />
+                      </Link>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </CardBody>
-      </Card>}
+                </div>
 
-      {agentCard && <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold">Input/Output Modes</h3>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium mb-3">Default Input Modes</h4>
-              <div className="flex flex-wrap gap-2">
-                {agentCard.defaultInputModes.map((mode, index) => (
-                  <Chip key={index} variant="flat" color="primary" size="sm">
-                    {mode}
+                <div>
+                  <h4 className="font-medium mb-2">Links</h4>
+                  <div className="space-y-2">
+                    <Link href={agentCard.url} target="_blank" className="text-primary text-small flex items-center gap-1">
+                      Service URL({agentCard.url}) <ExternalLink size={12} />
+                    </Link>
+                    {agentCard.documentationUrl && (
+                      <Link href={agentCard.documentationUrl} target="_blank" className="text-primary text-small flex items-center gap-1">
+                        Documentation({agentCard.documentationUrl}) <ExternalLink size={12} />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-warning" />
+                <h3 className="text-lg font-semibold">Capabilities</h3>
+              </div>
+            </CardHeader>
+            <CardBody>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
+                  <span>SSE</span>
+                  <Chip
+                    color={agentCard.capabilities?.streaming ? "success" : "default"}
+                    variant="flat"
+                    size="sm"
+                  >
+                    {agentCard.capabilities.streaming ? "Supported" : "Not Supported"}
                   </Chip>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="font-medium mb-3">Default Output Modes</h4>
-              <div className="flex flex-wrap gap-2">
-                {agentCard.defaultOutputModes.map((mode, index) => (
-                  <Chip key={index} variant="flat" color="secondary" size="sm">
-                    {mode}
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
+                  <span>Push Notifications</span>
+                  <Chip
+                    color={agentCard.capabilities.pushNotifications ? "success" : "default"}
+                    variant="flat"
+                    size="sm"
+                  >
+                    {agentCard.capabilities.pushNotifications ? "Supported" : "Not Supported"}
                   </Chip>
-                ))}
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
+                  <span>Exposes task status<br />change history</span>
+                  <Chip
+                    color={agentCard.capabilities.stateTransitionHistory ? "success" : "default"}
+                    variant="flat"
+                    size="sm"
+                  >
+                    {agentCard.capabilities.stateTransitionHistory ? "Supported" : "Not Supported"}
+                  </Chip>
+                </div>
               </div>
-            </div>
-          </div>
-        </CardBody>
-      </Card>}
 
-      {agentCard && <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-success" />
-            <h3 className="text-lg font-semibold">Security Configuration</h3>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <div className="space-y-4">
-            {Object.entries(agentCard.securitySchemes || {}).map(([schemeName, scheme]) =>
-              renderSecurityScheme(schemeName, scheme)
-            )}
+              {agentCard.capabilities.extensions && agentCard.capabilities.extensions.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-medium mb-3">Extensions</h4>
+                  <div className="space-y-4">
+                    {agentCard.capabilities.extensions.map((extension, index) => (
+                      <div key={index} className="bg-default-50 rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Link href={extension.uri} target="_blank" className="text-primary text-small flex items-center gap-1">
+                                {extension.uri} <ExternalLink size={12} />
+                              </Link>
+                              <div className="flex items-center gap-1 ml-4">
+                                <Chip
+                                  variant="flat"
+                                  color={extension.required ? "warning" : "default"}
+                                  size="sm"
+                                >
+                                  {extension.required ? "Required" : "Optional"}
+                                </Chip>
+                                <Tooltip content="Whether the client must follow specific requirements of the extension.">
+                                  <CircleHelp size={18} className="text-default-500" />
+                                </Tooltip>
+                              </div>
+                            </div>
+                            {extension.description && (
+                              <p className="text-small text-default-600">{extension.description}</p>
+                            )}
+                          </div>
+                        </div>
 
-            <Divider className="my-4" />
+                        {extension.params && (
+                          <div>
+                            <h5 className="font-medium mb-2">Parameters</h5>
+                            <div className="bg-default-100 rounded-lg p-3">
+                              {(() => {
+                                const params = typeof extension.params === 'string'
+                                  ? JSON.parse(extension.params)
+                                  : extension.params;
 
-            <div className="p-2">
-              <h4 className="font-medium mb-2">Security Permissions</h4>
-              <div className="flex flex-wrap gap-2">
-                {agentCard.security?.map((securityItem, index) =>
-                  Object.entries(securityItem).map(([scheme, permissions]) =>
-                    permissions.map((permission, permIndex) => (
-                      <Chip key={`${index}-${scheme}-${permIndex}`} variant="flat" color="warning" size="sm">
-                        {scheme}: {permission}
+                                return (
+                                  <div className="space-y-2">
+                                    {Object.entries(params).map(([key, value]) => (
+                                      <div key={key} className="flex items-start gap-2">
+                                        <div className="min-w-[120px]">
+                                          <Chip variant="flat" color="primary" size="sm" className="w-full justify-center">
+                                            {key}
+                                          </Chip>
+                                        </div>
+                                        <div className="flex-1">
+                                          <Chip variant="flat" color="secondary" size="sm" className="w-full">
+                                            {String(value)}
+                                          </Chip>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold">Input/Output Modes</h3>
+              </div>
+            </CardHeader>
+            <CardBody>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium mb-3">Default Input Modes</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {agentCard.defaultInputModes.map((mode, index) => (
+                      <Chip key={index} variant="flat" color="primary" size="sm">
+                        {mode}
                       </Chip>
-                    ))
-                  )
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-3">Default Output Modes</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {agentCard.defaultOutputModes.map((mode, index) => (
+                      <Chip key={index} variant="flat" color="secondary" size="sm">
+                        {mode}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-success" />
+                <h3 className="text-lg font-semibold">Security Configuration</h3>
+              </div>
+            </CardHeader>
+            <CardBody>
+              <div className="space-y-4">
+                {Object.entries(agentCard.securitySchemes || {}).map(([schemeName, scheme]) =>
+                  renderSecurityScheme(schemeName, scheme)
                 )}
-              </div>
-            </div>
-          </div>
-        </CardBody>
-      </Card>}
 
-      {agentCard && <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold">Skills</h3>
-        </CardHeader>
-        <CardBody>
-          <div className="space-y-4">
-            {agentCard.skills.map((skill) => (
-              <div key={skill.id} className="bg-default-50 rounded-lg p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h4 className="font-medium text-lg">{skill.name}</h4>
-                    <p className="text-small text-default-500">ID: {skill.id}</p>
-                  </div>
-                </div>
+                <Divider className="my-4" />
 
-                <p className="text-default-600 mb-3">{skill.description}</p>
-
-                <div className="space-y-3">
-                  <div>
-                    <h5 className="font-medium mb-2">Tags</h5>
-                    <div className="flex flex-wrap gap-2">
-                      {skill.tags.map((tag, tagIndex) => (
-                        <Chip key={tagIndex} variant="flat" size="sm">
-                          {tag}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h5 className="font-medium mb-2">Examples</h5>
-                    <div className="bg-default-100 rounded-lg p-3">
-                      {skill.examples?.map((example, exampleIndex) => (
-                        <p key={exampleIndex} className="text-small text-default-600">
-                          {example}
-                        </p>
-                      ))}
-                    </div>
+                <div className="p-2">
+                  <h4 className="font-medium mb-2">Security Permissions</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {agentCard.security?.map((securityItem, index) =>
+                      Object.entries(securityItem).map(([scheme, permissions]) =>
+                        permissions.map((permission, permIndex) => (
+                          <Chip key={`${index}-${scheme}-${permIndex}`} variant="flat" color="warning" size="sm">
+                            {scheme}: {permission}
+                          </Chip>
+                        ))
+                      )
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardBody>
-      </Card>}
+            </CardBody>
+          </Card>
 
-      {agentCard && <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold">Configuration</h3>
-        </CardHeader>
-        <CardBody>
-          <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
-            <span>Supports Authenticated Extended Card</span>
-            <Chip
-              color={agentCard.supportsAuthenticatedExtendedCard ? "success" : "default"}
-              variant="flat"
-              size="sm"
-            >
-              {agentCard.supportsAuthenticatedExtendedCard ? "Supported" : "Not Supported"}
-            </Chip>
-          </div>
-        </CardBody>
-      </Card>}
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold">Skills</h3>
+            </CardHeader>
+            <CardBody>
+              <div className="space-y-4">
+                {agentCard.skills.map((skill) => (
+                  <div key={skill.id} className="bg-default-50 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="font-medium text-lg">{skill.name}</h4>
+                        <p className="text-small text-default-500">ID: {skill.id}</p>
+                      </div>
+                    </div>
 
+                    <p className="text-default-600 mb-3">{skill.description}</p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <h5 className="font-medium mb-2">Tags</h5>
+                        <div className="flex flex-wrap gap-2">
+                          {skill.tags.map((tag, tagIndex) => (
+                            <Chip key={tagIndex} variant="flat" size="sm">
+                              {tag}
+                            </Chip>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h5 className="font-medium mb-2">Examples</h5>
+                        <div className="bg-default-100 rounded-lg p-3">
+                          {skill.examples?.map((example, exampleIndex) => (
+                            <p key={exampleIndex} className="text-small text-default-600">
+                              {example}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold">Configuration</h3>
+            </CardHeader>
+            <CardBody>
+              <div className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
+                <span>Supports Authenticated Extended Card</span>
+                <Chip
+                  color={agentCard.supportsAuthenticatedExtendedCard ? "success" : "default"}
+                  variant="flat"
+                  size="sm"
+                >
+                  {agentCard.supportsAuthenticatedExtendedCard ? "Supported" : "Not Supported"}
+                </Chip>
+              </div>
+            </CardBody>
+          </Card>
+        </>
+      )}
       <Modal isOpen={isOpenDeleteAgentCard} onOpenChange={setIsOpenDeleteAgentCard}>
         <ModalContent>
           <ModalHeader>

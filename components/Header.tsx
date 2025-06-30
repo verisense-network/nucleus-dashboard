@@ -10,16 +10,21 @@ import { CheckCircle, Settings, XCircle } from "lucide-react";
 import SetEndpoint from "./endpoint/SetEndpoint";
 import { useEffect, useState } from "react";
 import { getNodeDetail } from "@/app/actions";
+import { AddressViewFormat } from "@/utils/format";
 
 export default function Header() {
   const [isOpenSetEndpoint, setIsOpenSetEndpoint] = useState(false);
-  const { endpoint, status, setStatus } = useEndpointStore();
+  const { endpoint, status, setStatus, setEndpoint, endpoints } = useEndpointStore();
 
   useEffect(() => {
     const fetchNodeDetail = async () => {
       if (!endpoint) {
         setStatus("disconnected");
-        setIsOpenSetEndpoint(true);
+        if (endpoints.length > 0) {
+          setEndpoint(endpoints[0]);
+        } else {
+          setIsOpenSetEndpoint(true);
+        }
         return;
       } else {
         setIsOpenSetEndpoint(false)
@@ -43,7 +48,7 @@ export default function Header() {
     return () => {
       setStatus("disconnected");
     }
-  }, [endpoint, setStatus]);
+  }, [endpoint, endpoints, setEndpoint, setStatus]);
 
   return (
     <header className="fixed top-0 left-0 w-full h-16 border-b bg-white border-zinc-200 dark:bg-black dark:border-zinc-800 z-50">
@@ -54,7 +59,7 @@ export default function Header() {
           </Link>
           <Divider orientation="vertical" className="h-6 text-foreground" />
           <Link href="/">
-            <span className="text-base font-bold">Dashboard</span>
+            <span className="text-xs md:text-base font-bold">Dashboard</span>
           </Link>
         </div>
         <div className="flex-shrink-0 flex space-x-1 md:space-x-5 items-center">
@@ -67,12 +72,12 @@ export default function Header() {
                   "disconnected": <XCircle size="14" className="text-danger" />
                 }[status]
               }
-              <Button size="sm" color="primary" isIconOnly onPress={() => setIsOpenSetEndpoint(true)}>
+              <Button size="sm" color="primary" variant="faded" isIconOnly onPress={() => setIsOpenSetEndpoint(true)}>
                 <Settings className="w-4 h-4" />
               </Button>
             </span>
-            <span className="text-sm text-foreground">
-              {endpoint || "No endpoint"}
+            <span className="text-xs md:text-sm text-foreground">
+              {endpoint ? <AddressViewFormat address={endpoint} bracket={false} /> : "No endpoint"}
             </span>
           </div>
           <WalletStatus />
