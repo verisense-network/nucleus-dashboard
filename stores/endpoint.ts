@@ -23,7 +23,7 @@ export const useEndpointStore = create<Store>()(
     (set, get) => ({
       status: "disconnected",
       endpoint: "",
-      endpoints: [ENDPOINT],
+      endpoints: [ENDPOINT, "ws://localhost:9955"],
       isLocalNode: (endpoint: string) => {
         return endpoint.includes("localhost") || endpoint.includes("127.0.0.1") || endpoint.includes("192.168.");
       },
