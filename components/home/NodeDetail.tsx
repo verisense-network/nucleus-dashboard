@@ -9,9 +9,11 @@ import { formatReadableAmount } from "@/utils/format";
 import { useEndpointStore } from "@/stores/endpoint";
 import { useEffect, useMemo, useState } from "react";
 import { Spinner } from "@heroui/react";
+import { getNodeDetailAPI } from "@/api/node";
+import { wrapApiRequest } from "@/utils/api";
 
 export default function NodeDetail() {
-  const { endpoint, status } = useEndpointStore();
+  const { endpoint, status, isLocalNode } = useEndpointStore();
 
   const [nodeInfo, setNodeInfo] = useState<NodeInfo | null>(null);
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
@@ -28,7 +30,8 @@ export default function NodeDetail() {
         }
 
         setIsLoading(true);
-        const result = await getNodeDetail(endpoint);
+
+        const result = await wrapApiRequest(getNodeDetail.bind(null, endpoint), getNodeDetailAPI.bind(null, endpoint), isLocalNode(endpoint));
 
         if (!result.success) {
           setError(result.message || "Unknown error");

@@ -8,13 +8,15 @@ import { AgentInfo, getAgentList } from "@/app/actions";
 import { useEffect, useState } from "react";
 import { useEndpointStore } from "@/stores/endpoint";
 import { Spinner } from "@heroui/react";
+import { wrapApiRequest } from "@/utils/api";
+import { getAgentListAPI } from "@/api/rpc";
 
 export const ListboxWrapper = ({ children }: { children: React.ReactNode }) => (
   <div className="w-full px-1 py-2 rounded-small">{children}</div>
 );
 
 export default function AgentList() {
-  const { endpoint, status: endpointStatus } = useEndpointStore();
+  const { endpoint, status: endpointStatus, isLocalNode } = useEndpointStore();
   const [agentList, setAgentList] = useState<AgentInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +29,7 @@ export default function AgentList() {
 
       try {
         setIsLoading(true);
-        const result = await getAgentList(endpoint);
+        const result = await wrapApiRequest(getAgentList.bind(null, endpoint), getAgentListAPI.bind(null, endpoint), isLocalNode(endpoint));
 
         if (!result.success) {
           setError(result.message || "Unknown error");

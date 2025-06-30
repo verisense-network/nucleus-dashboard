@@ -15,6 +15,7 @@ type Store = {
   setEndpoint: (endpoint: string) => void;
   removeEndpoint: (endpoint: string) => void;
   setStatus: (status: EndpointStatus) => void;
+  isLocalNode: (endpoint: string) => boolean;
 };
 
 export const useEndpointStore = create<Store>()(
@@ -23,6 +24,9 @@ export const useEndpointStore = create<Store>()(
       status: "disconnected",
       endpoint: "",
       endpoints: [ENDPOINT],
+      isLocalNode: (endpoint: string) => {
+        return endpoint.includes("localhost") || endpoint.includes("127.0.0.1") || endpoint.includes("192.168.");
+      },
       setEndpoint: (endpoint: string) => {
         const { endpoints } = get();
         const newEndpoints = [endpoint, ...endpoints].filter((e, index, self) => self.indexOf(e) === index);

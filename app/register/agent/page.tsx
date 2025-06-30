@@ -5,7 +5,6 @@ import { Suspense, useState } from "react";
 import { AgentCard } from "@/types/a2a";
 import { toast } from "react-toastify";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
-import { invalidateCache } from "@/app/actions";
 import { useEndpointStore } from "@/stores/endpoint";
 import { registerAgent } from "@/api/rpc";
 import { Spinner } from "@heroui/react";
@@ -42,7 +41,6 @@ export default function AgentRegistrationPage() {
       });
       console.log('Transaction finalized with hash:', resFinalizedHash);
 
-      invalidateCache('/');
     } catch (error) {
       console.error('Registration failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed, please try again';

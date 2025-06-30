@@ -4,7 +4,6 @@ import { getNucleusDetail } from "@/app/actions";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { ArrowLeft } from "lucide-react";
-import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import NucleusCard from "@/components/home/components/NucleusCard";
@@ -12,8 +11,10 @@ import AbiDetails from "@/components/nucleus/abi/AbiDetails";
 import OpenLogs from "@/components/nucleus/OpenLogs";
 import { use, useEffect, useState } from "react";
 import { NucleusInfo } from "@/types/nucleus";
-import { useEndpointStore } from "@/stores/endpoint";
 import { Spinner } from "@heroui/react";
+import { wrapApiRequest } from "@/utils/api";
+import { getNucleusByIdAPI } from "@/api/nucleus";
+import { useHydrationEndpointStore } from "@/stores/endpoint";
 
 interface NucleusDetailPageProps {
   params: Promise<{
@@ -24,16 +25,18 @@ interface NucleusDetailPageProps {
 export default function NucleusDetailPage({ params }: NucleusDetailPageProps) {
   const { nucleusId } = use(params);
 
-  const { endpoint } = useEndpointStore();
+  const [{ endpoint, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
 
   const [nuclei, setNuclei] = useState<NucleusInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (!hydrated) return;
     const fetchNucleusDetail = async () => {
+
       setIsLoading(true);
-      const result = await getNucleusDetail(endpoint, nucleusId);
+      const result = await wrapApiRequest(getNucleusDetail.bind(null, endpoint, nucleusId), getNucleusByIdAPI.bind(null, endpoint, nucleusId), isLocalNode(endpoint));
       if (!result.success || !result.data) {
         setError(result.message || "Unknown error");
       } else {
@@ -43,7 +46,7 @@ export default function NucleusDetailPage({ params }: NucleusDetailPageProps) {
     };
 
     fetchNucleusDetail();
-  }, [endpoint, nucleusId]);
+  }, [endpoint, nucleusId, hydrated, isLocalNode]);
 
 
   if (error?.includes("404") || error?.includes("not found")) {

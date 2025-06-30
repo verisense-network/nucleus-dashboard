@@ -7,14 +7,6 @@ import { NodeDetail } from "@/types/node";
 import { AgentCard } from "@/types/a2a";
 import { APIResponse } from "@/types/api";
 import { getAgentByIdAPI, getAgentListAPI } from "@/api/rpc";
-import { revalidatePath } from "next/cache";
-import { Id } from "react-toastify";
-
-
-export async function invalidateCache(path: string) {
-  revalidatePath(path);
-  return { success: true };
-}
 
 export async function getNucleusList(endpoint: string): Promise<NucleusListResponse> {
   try {
@@ -50,11 +42,7 @@ export async function getNucleusDetail(endpoint: string, id: string): Promise<AP
   }
 }
 
-export async function getNodeDetail(endpoint: string): Promise<{
-  success: boolean;
-  data?: NodeDetail;
-  message?: string;
-}> {
+export async function getNodeDetail(endpoint: string): Promise<APIResponse<NodeDetail>> {
   try {
     const data = await getNodeDetailAPI(endpoint);
     

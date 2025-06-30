@@ -10,10 +10,12 @@ import { CheckCircle, Settings, XCircle } from "lucide-react";
 import SetEndpoint from "./endpoint/SetEndpoint";
 import { useEffect, useState } from "react";
 import { getNodeDetail } from "@/app/actions";
+import { wrapApiRequest } from "@/utils/api";
+import { getNodeDetailAPI } from "@/api/node";
 
 export default function Header() {
   const [isOpenSetEndpoint, setIsOpenSetEndpoint] = useState(false);
-  const [{ endpoint, status, setStatus, setEndpoint, endpoints}, hydrated] = useHydrationEndpointStore(state => state);
+  const [{ endpoint, status, setStatus, setEndpoint, endpoints, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
 
   useEffect(() => {
     const fetchNodeDetail = async () => {
@@ -33,7 +35,7 @@ export default function Header() {
 
       setStatus("connecting");
       try {
-        const result = await getNodeDetail(endpoint);
+        const result = await wrapApiRequest(getNodeDetail.bind(null, endpoint), getNodeDetailAPI.bind(null, endpoint), isLocalNode(endpoint));
         if (!result.success) {
           setStatus("disconnected");
         } else {
@@ -49,7 +51,7 @@ export default function Header() {
     return () => {
       setStatus("disconnected");
     }
-  }, [endpoint, endpoints, setEndpoint, setStatus, hydrated]);
+  }, [endpoint, endpoints, setEndpoint, setStatus, hydrated, isLocalNode]);
 
   return (
     <header className="fixed top-0 left-0 w-full h-16 border-b bg-white border-zinc-200 dark:bg-black dark:border-zinc-800 z-50">

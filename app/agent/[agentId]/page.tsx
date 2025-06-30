@@ -15,10 +15,11 @@ import { User } from "@heroui/user";
 import { AddressViewFormat } from "@/utils/format";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { use, useEffect, useState } from "react";
-import { useEndpointStore } from "@/stores/endpoint";
+import { useEndpointStore, useHydrationEndpointStore } from "@/stores/endpoint";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
 import { toast } from "react-toastify";
-import { deleteAgent } from "@/api/rpc";
+import { deleteAgent, getAgentByIdAPI } from "@/api/rpc";
+import { wrapApiRequest } from "@/utils/api";
 
 interface AgentDetailPageProps {
   params: Promise<{
@@ -28,7 +29,7 @@ interface AgentDetailPageProps {
 
 export default function AgentDetailPage({ params }: AgentDetailPageProps) {
   const { agentId } = use(params);
-  const { endpoint } = useEndpointStore();
+  const [{ endpoint, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
   const router = useRouter();
 
   const [agent, setAgent] = useState<AgentInfo | null>(null);
@@ -41,10 +42,13 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    if (!hydrated) return;
+
     const fetchAgent = async () => {
+
       try {
         setIsLoading(true);
-        const result = await getAgentById(endpoint, agentId);
+        const result = await wrapApiRequest(getAgentById.bind(null, endpoint, agentId), getAgentByIdAPI.bind(null, endpoint, agentId), isLocalNode(endpoint));
         if (result.success && result.data) {
           setAgent(result.data);
         }
@@ -55,7 +59,7 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
       }
     };
     fetchAgent();
-  }, [endpoint, agentId]);
+  }, [endpoint, agentId, hydrated, isLocalNode]);
 
   useEffect(() => {
     if (agent) {

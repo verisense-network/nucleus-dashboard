@@ -15,7 +15,7 @@ import { HttpProvider, WsProvider } from "@polkadot/rpc-provider";
 import { ApiPromise } from "@polkadot/api";
 import { u8aToHex } from "@polkadot/util";
 import { generateCode } from "./generator";
-import { useEndpointStore } from "@/stores/endpoint";
+import { useHydrationEndpointStore } from "@/stores/endpoint";
 
 interface AbiDetailsProps {
   nucleus: NucleusInfo;
@@ -27,10 +27,12 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
   const [tsCode, setTsCode] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("types");
-  const { endpoint } = useEndpointStore();
+  const [{ endpoint }, hydrated] = useHydrationEndpointStore(state => state);
 
 
   const loadAbiData = useCallback(async () => {
+    if (!hydrated) return;
+
     setLoading(true);
     setError(null);
     try {
@@ -51,7 +53,7 @@ export default function AbiDetails({ nucleus }: AbiDetailsProps) {
     } finally {
       setLoading(false);
     }
-  }, [nucleus.id]);
+  }, [nucleus.id, hydrated]);
 
   const extractAndExecuteCodeAfterInitApi = useCallback((jsCode: string) => {
     const initApiFunctionStart = jsCode.indexOf('export async function initApi(endpoint)');

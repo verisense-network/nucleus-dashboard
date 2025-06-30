@@ -7,13 +7,15 @@ import NucleusCard from "./components/NucleusCard";
 import { useEffect, useState } from "react";
 import { useEndpointStore } from "@/stores/endpoint";
 import { Spinner } from "@heroui/react";
+import { wrapApiRequest } from "@/utils/api";
+import { getNucleusListAPI } from "@/api/nucleus";
 
 export const ListboxWrapper = ({ children }: { children: React.ReactNode }) => (
   <div className="w-full px-1 py-2 rounded-small">{children}</div>
 );
 
 export default function NucleusList() {
-  const { endpoint, status: endpointStatus } = useEndpointStore();
+  const { endpoint, status: endpointStatus, isLocalNode } = useEndpointStore();
   const [nucleusList, setNucleusList] = useState<NucleusInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +28,7 @@ export default function NucleusList() {
 
       try {
         setIsLoading(true);
-        const result = await getNucleusList(endpoint);
+        const result = await wrapApiRequest(getNucleusList.bind(null, endpoint), getNucleusListAPI.bind(null, endpoint), isLocalNode(endpoint));
 
         if (!result.success) {
           setError(result.message || "Unknown error");
