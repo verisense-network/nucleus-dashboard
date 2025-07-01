@@ -7,7 +7,7 @@ import Link from "next/link";
 import { AgentInfo, getAgentList } from "@/app/actions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEndpointStore } from "@/stores/endpoint";
-import { Spinner } from "@heroui/react";
+import { cn, Spinner } from "@heroui/react";
 import { wrapApiRequest } from "@/utils/api";
 import { getAgentListAPI } from "@/api/rpc";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -49,6 +49,9 @@ export default function AgentList() {
 
         if (result.data) {
           setAgentList(result.data);
+          setInterval(() => {
+            setAgentList(list => ([...list.slice(1)]));
+          }, 2000);
         }
       } catch (error) {
         console.error(error);
@@ -69,6 +72,18 @@ export default function AgentList() {
       }
     }
   }, []);
+
+  const getGridHeight = (length: number): string => {
+    const heights = ["min-h-[150px] h-[10vh]", "min-h-[260px] h-[20vh]", "min-h-[380px] h-[35vh]", "min-h-[600px] h-[50vh]"];
+    const thresholds = [1, 3, 5, 7];
+
+    for (let i = thresholds.length - 1; i >= 0; i--) {
+      if (length >= thresholds[i]) {
+        return heights[i];
+      }
+    }
+    return heights[0];
+  };
 
   if (endpointStatus === "connecting") {
     return (
@@ -120,7 +135,7 @@ export default function AgentList() {
           </Card>
         ) : (
           <Swiper
-            spaceBetween={30}
+            spaceBetween={20}
             breakpoints={{
               640: {
                 slidesPerView: 1,
@@ -131,9 +146,9 @@ export default function AgentList() {
             }}
             modules={[Grid, Pagination, Navigation]}
             grid={{
-              rows: 4,
+              rows: Math.min(4, Math.ceil(agentList.length / 2)),
             }}
-            className="w-full h-[55vh]"
+            className={cn("w-full", getGridHeight(agentList.length))}
             onSwiper={(swiper) => {
               swiperRef.current = swiper;
               setIsBeginning(swiper.isBeginning);
