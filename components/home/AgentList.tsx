@@ -114,9 +114,16 @@ export default function AgentList() {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <Button size="sm" color="primary">
-            <Link href="/register/agent">Register Agent</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm">
+              <Link href="https://space.verisense.network" target="_blank">
+                Sensespace
+              </Link>
+            </Button>
+            <Button size="sm" color="primary">
+              <Link href="/register/agent">Register Agent</Link>
+            </Button>
+          </div>
         </div>
       </div>
       <div className="w-full mx-auto">
