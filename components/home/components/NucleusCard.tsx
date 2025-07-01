@@ -27,7 +27,7 @@ export default function NucleusCard({ nucleus, showLink = true }: NucleusCardPro
             </div>
           </div>
           <div className="flex items-center gap-2 text-default-500">
-            <span className="text-sm">ID: {nucleus.id}</span>
+            <span className="text-sm truncate">ID: {nucleus.id}</span>
           </div>
         </div>
       </CardBody>
