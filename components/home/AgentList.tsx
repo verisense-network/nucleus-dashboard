@@ -104,7 +104,7 @@ export default function AgentList() {
   return (
     <>
       <div className="flex justify-between items-center">
-        <h2 className="text-lg mb-4">Agents</h2>
+        <h2 className="text-lg mb-4">Agents <span className="text-sm text-default-500">({agentList.length})</span></h2>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Button size="sm" isIconOnly onPress={() => handleNavigation("prev")} isDisabled={isBeginning}>

@@ -69,7 +69,7 @@ export default function NucleusList() {
 
   return (
     <>
-      <h2 className="text-lg mb-4">Nucleus</h2>
+      <h2 className="text-lg mb-4">Nucleus <span className="text-sm text-default-500">({nucleusList.length})</span></h2>
       <div className="w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
         {isLoading ? (
           <div className="w-full mx-auto">
