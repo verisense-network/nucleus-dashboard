@@ -49,9 +49,6 @@ export default function AgentList() {
 
         if (result.data) {
           setAgentList(result.data);
-          setInterval(() => {
-            setAgentList(list => ([...list.slice(1)]));
-          }, 2000);
         }
       } catch (error) {
         console.error(error);
