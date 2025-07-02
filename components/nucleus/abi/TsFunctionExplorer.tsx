@@ -2971,7 +2971,7 @@ export default function TsFunctionExplorer({ tsCode, nucleusId, type }: TsFuncti
       {extractedClasses.length > 0 && type === 'type' && (
         <Card>
           <CardHeader>
-            <h4 className="text-md font-semibold">Polkadot Codec Types</h4>
+            <h4 className="text-md font-semibold">Codec Types</h4>
           </CardHeader>
           <CardBody>
             <Accordion selectionMode="multiple">
