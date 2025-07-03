@@ -2,21 +2,22 @@
 
 import { Card, CardBody } from "@heroui/card";
 import AgentCard from "./components/AgentCard";
-import { Button } from "@heroui/button";
+import { Button, Chip, Pagination as PaginationComponent } from "@heroui/react";
 import Link from "next/link";
 import { AgentInfo, getAgentList } from "@/app/actions";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEndpointStore } from "@/stores/endpoint";
-import { cn, Spinner } from "@heroui/react";
+import { cn, Input, Spinner } from "@heroui/react";
 import { wrapApiRequest } from "@/utils/api";
 import { getAgentListAPI } from "@/api/rpc";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import type { Swiper as SwiperType } from 'swiper';
 import { Grid, Navigation, Pagination } from 'swiper/modules';
 
 import 'swiper/css';
 import 'swiper/css/grid';
+import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 
 export const ListboxWrapper = ({ children }: { children: React.ReactNode }) => (
@@ -30,6 +31,10 @@ export default function AgentList() {
   const [isLoading, setIsLoading] = useState(false);
   const [isBeginning, setIsBeginning] = useState(true);
   const [isEnd, setIsEnd] = useState(false);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const swiperRef = useRef<SwiperType | null>(null);
 
   useEffect(() => {
@@ -60,6 +65,17 @@ export default function AgentList() {
     fetchAgentList();
   }, [endpoint, endpointStatus]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleNavigation = useCallback((direction: "prev" | "next") => {
     if (swiperRef.current) {
       if (direction === "prev") {
@@ -82,6 +98,33 @@ export default function AgentList() {
     return heights[0];
   };
 
+  const filteredAgentList = useMemo(() => {
+    if (search === "") {
+      return agentList;
+    }
+
+    return agentList.filter((agent) =>
+      agent.agentCard?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      agent.agentCard?.description?.toLowerCase().includes(search.toLowerCase()) ||
+      agent.agentCard?.skills?.some((skill) => [skill.name?.toLowerCase(), skill.description?.toLowerCase(), skill.tags?.join(", ")?.toLowerCase()].some((text) => text?.includes(search.toLowerCase())))
+    );
+  }, [agentList, search]);
+
+  const calculateTotalPages = useMemo(() => {
+    if (filteredAgentList.length === 0) return 1;
+
+    const itemsPerPage = windowWidth >= 1024 ? 8 : 4;
+    return Math.ceil(filteredAgentList.length / itemsPerPage);
+  }, [filteredAgentList.length, windowWidth]);
+
+  useEffect(() => {
+    setTotalPages(calculateTotalPages);
+    setCurrentPage(1);
+    if (swiperRef.current) {
+      swiperRef.current.slideTo(0);
+    }
+  }, [calculateTotalPages]);
+
   if (endpointStatus === "connecting") {
     return (
       <div className="w-full mx-auto">
@@ -103,9 +146,14 @@ export default function AgentList() {
 
   return (
     <>
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg mb-4">Agents <span className="text-sm text-default-500">({agentList.length})</span></h2>
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-center">
+        <h2 className="text-lg mb-4 md:mb-0 flex items-center gap-2">
+          Agents <Chip size="sm">{agentList.length}</Chip>
+        </h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <div>
+            <Input startContent={<Search className="w-4 h-4" />} placeholder="Search" size="sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
           <div className="flex items-center gap-2">
             <Button size="sm" isIconOnly onPress={() => handleNavigation("prev")} isDisabled={isBeginning}>
               <ChevronLeft className="w-4 h-4" />
@@ -126,7 +174,7 @@ export default function AgentList() {
           </div>
         </div>
       </div>
-      <div className="w-full mx-auto">
+      <div className="w-full mx-auto mt-4">
         {isLoading ? (
           <div className="w-full mx-auto">
             <Spinner />
@@ -138,38 +186,52 @@ export default function AgentList() {
             </CardBody>
           </Card>
         ) : (
-          <Swiper
-            spaceBetween={20}
-            breakpoints={{
-              640: {
-                slidesPerView: 1,
-              },
-              1024: {
-                slidesPerView: 2,
-              },
-            }}
-            modules={[Grid, Pagination, Navigation]}
-            grid={{
-              rows: Math.min(4, Math.ceil(agentList.length / 2)),
-            }}
-            className={cn("w-full", getGridHeight(agentList.length))}
-            onSwiper={(swiper) => {
-              swiperRef.current = swiper;
-              setIsBeginning(swiper.isBeginning);
-              setIsEnd(swiper.isEnd);
-            }}
-            onSlideChange={(swiper) => {
-              setIsBeginning(swiper.isBeginning);
-              setIsEnd(swiper.isEnd);
-            }}
-          >
-            {
-              agentList.map((agent) => (
-                <SwiperSlide key={`${agent.agentId}-${agent.ownerId}`} className="flex justify-center items-center">
-                  <AgentCard agent={agent} showLink={true} />
-                </SwiperSlide>
-              ))}
-          </Swiper>
+          <>
+            <Swiper
+              spaceBetween={20}
+              breakpoints={{
+                640: {
+                  slidesPerView: 1,
+                },
+                1024: {
+                  slidesPerView: 2,
+                },
+              }}
+              modules={[Grid, Pagination, Navigation]}
+              grid={{
+                rows: Math.min(4, Math.ceil(filteredAgentList.length / 2)),
+              }}
+              className={cn("w-full", getGridHeight(filteredAgentList.length))}
+              onSwiper={(swiper) => {
+                swiperRef.current = swiper;
+                setIsBeginning(swiper.isBeginning);
+                setIsEnd(swiper.isEnd);
+                setCurrentPage(swiper.activeIndex + 1);
+                setTotalPages(calculateTotalPages);
+              }}
+              onSlideChange={(swiper) => {
+                setIsBeginning(swiper.isBeginning);
+                setIsEnd(swiper.isEnd);
+                setCurrentPage(swiper.activeIndex + 1);
+                setTotalPages(calculateTotalPages);
+              }}
+            >
+              {
+                filteredAgentList.map((agent) => (
+                  <SwiperSlide key={`${agent.agentId}-${agent.ownerId}`} className="flex justify-center items-center">
+                    <AgentCard agent={agent} showLink={true} />
+                  </SwiperSlide>
+                ))}
+            </Swiper>
+            <div className="flex items-center mt-4">
+              <PaginationComponent total={totalPages} page={currentPage} showControls={false} onChange={(page) => {
+                if (swiperRef.current) {
+                  swiperRef.current.slideTo(page - 1);
+                  setCurrentPage(page);
+                }
+              }} />
+            </div>
+          </>
         )}
       </div>
     </>
