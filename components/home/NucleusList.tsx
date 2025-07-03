@@ -28,8 +28,6 @@ export default function NucleusList() {
   const [nucleusList, setNucleusList] = useState<NucleusInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isBeginning, setIsBeginning] = useState(true);
-  const [isEnd, setIsEnd] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -63,16 +61,6 @@ export default function NucleusList() {
     };
     fetchNucleusList();
   }, [endpoint, endpointStatus]);
-
-  const handleNavigation = useCallback((direction: "prev" | "next") => {
-    if (swiperRef.current) {
-      if (direction === "prev") {
-        swiperRef.current.slidePrev();
-      } else {
-        swiperRef.current.slideNext();
-      }
-    }
-  }, []);
 
   const getGridHeight = (length: number): string => {
     const heights = ["min-h-[150px] h-[10vh]", "min-h-[260px] h-[15vh]", "min-h-[300px] h-[20vh]", "min-h-[400px] h-[25vh]", "min-h-[500px] h-[30vh]"];
@@ -137,17 +125,7 @@ export default function NucleusList() {
           Nucleus <Chip size="sm">{nucleusList.length}</Chip>
         </h2>
         <div className="flex flex-wrap items-center gap-4">
-          <div>
-            <Input startContent={<Search className="w-4 h-4" />} placeholder="Search" size="sm" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" isIconOnly onPress={() => handleNavigation("prev")} isDisabled={isBeginning}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button size="sm" isIconOnly onPress={() => handleNavigation("next")} isDisabled={isEnd}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+          <Input startContent={<Search className="w-4 h-4" />} placeholder="Search" size="sm" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
       <div className="w-full mx-auto mt-4">
@@ -180,16 +158,35 @@ export default function NucleusList() {
               className={cn("w-full", getGridHeight(filteredNucleusList.length))}
               onSwiper={(swiper) => {
                 swiperRef.current = swiper;
-                setIsBeginning(swiper.isBeginning);
-                setIsEnd(swiper.isEnd);
                 setCurrentPage(swiper.activeIndex + 1);
-                setTotalPages(calculateTotalPages);
+
+                const totalSlides = swiper.slides?.length || 0;
+
+                let actualPages = 1;
+                if (swiper.snapGrid && swiper.snapGrid.length > 0) {
+                  actualPages = swiper.snapGrid.length;
+                } else if (totalSlides > 0) {
+                  const slidesPerView = typeof swiper.params.slidesPerView === 'number' ? swiper.params.slidesPerView : (windowWidth >= 1024 ? 2 : 1);
+                  actualPages = Math.ceil(totalSlides / slidesPerView);
+                }
+
+                setTotalPages(actualPages);
+
               }}
               onSlideChange={(swiper) => {
-                setIsBeginning(swiper.isBeginning);
-                setIsEnd(swiper.isEnd);
                 setCurrentPage(swiper.activeIndex + 1);
-                setTotalPages(calculateTotalPages);
+
+                const totalSlides = swiper.slides?.length || 0;
+
+                let actualPages = 1;
+                if (swiper.snapGrid && swiper.snapGrid.length > 0) {
+                  actualPages = swiper.snapGrid.length;
+                } else if (totalSlides > 0) {
+                  const slidesPerView = typeof swiper.params.slidesPerView === 'number' ? swiper.params.slidesPerView : (windowWidth >= 1024 ? 2 : 1);
+                  actualPages = Math.ceil(totalSlides / slidesPerView);
+                }
+
+                setTotalPages(actualPages);
               }}
             >
               {
@@ -200,12 +197,17 @@ export default function NucleusList() {
                 ))}
             </Swiper>
             <div className="flex items-center mt-4">
-              <PaginationComponent total={totalPages} page={currentPage} showControls={false} onChange={(page) => {
-                if (swiperRef.current) {
-                  swiperRef.current.slideTo(page - 1);
-                  setCurrentPage(page);
-                }
-              }} />
+              <PaginationComponent
+                total={totalPages}
+                page={currentPage}
+                showControls
+                onChange={(page) => {
+                  if (swiperRef.current) {
+                    swiperRef.current.slideTo(page - 1);
+                    setCurrentPage(page);
+                  }
+                }}
+              />
             </div>
           </>
         )}

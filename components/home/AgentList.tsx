@@ -29,8 +29,6 @@ export default function AgentList() {
   const [agentList, setAgentList] = useState<AgentInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isBeginning, setIsBeginning] = useState(true);
-  const [isEnd, setIsEnd] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -74,16 +72,6 @@ export default function AgentList() {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const handleNavigation = useCallback((direction: "prev" | "next") => {
-    if (swiperRef.current) {
-      if (direction === "prev") {
-        swiperRef.current.slidePrev();
-      } else {
-        swiperRef.current.slideNext();
-      }
-    }
   }, []);
 
   const getGridHeight = (length: number): string => {
@@ -155,14 +143,6 @@ export default function AgentList() {
             <Input startContent={<Search className="w-4 h-4" />} placeholder="Search" size="sm" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" isIconOnly onPress={() => handleNavigation("prev")} isDisabled={isBeginning}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button size="sm" isIconOnly onPress={() => handleNavigation("next")} isDisabled={isEnd}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
             <Button size="sm">
               <Link href="https://space.verisense.network" target="_blank">
                 Sensespace
@@ -204,16 +184,35 @@ export default function AgentList() {
               className={cn("w-full", getGridHeight(filteredAgentList.length))}
               onSwiper={(swiper) => {
                 swiperRef.current = swiper;
-                setIsBeginning(swiper.isBeginning);
-                setIsEnd(swiper.isEnd);
                 setCurrentPage(swiper.activeIndex + 1);
-                setTotalPages(calculateTotalPages);
+
+                const totalSlides = swiper.slides?.length || 0;
+
+                let actualPages = 1;
+                if (swiper.snapGrid && swiper.snapGrid.length > 0) {
+                  actualPages = swiper.snapGrid.length;
+                } else if (totalSlides > 0) {
+                  const slidesPerView = typeof swiper.params.slidesPerView === 'number' ? swiper.params.slidesPerView : (windowWidth >= 1024 ? 2 : 1);
+                  actualPages = Math.ceil(totalSlides / slidesPerView);
+                }
+
+                setTotalPages(actualPages);
+
               }}
               onSlideChange={(swiper) => {
-                setIsBeginning(swiper.isBeginning);
-                setIsEnd(swiper.isEnd);
                 setCurrentPage(swiper.activeIndex + 1);
-                setTotalPages(calculateTotalPages);
+
+                const totalSlides = swiper.slides?.length || 0;
+
+                let actualPages = 1;
+                if (swiper.snapGrid && swiper.snapGrid.length > 0) {
+                  actualPages = swiper.snapGrid.length;
+                } else if (totalSlides > 0) {
+                  const slidesPerView = typeof swiper.params.slidesPerView === 'number' ? swiper.params.slidesPerView : (windowWidth >= 1024 ? 2 : 1);
+                  actualPages = Math.ceil(totalSlides / slidesPerView);
+                }
+
+                setTotalPages(actualPages);
               }}
             >
               {
@@ -224,12 +223,17 @@ export default function AgentList() {
                 ))}
             </Swiper>
             <div className="flex items-center mt-4">
-              <PaginationComponent total={totalPages} page={currentPage} showControls={false} onChange={(page) => {
-                if (swiperRef.current) {
-                  swiperRef.current.slideTo(page - 1);
-                  setCurrentPage(page);
-                }
-              }} />
+              <PaginationComponent
+                total={totalPages}
+                page={currentPage}
+                showControls
+                onChange={(page) => {
+                  if (swiperRef.current) {
+                    swiperRef.current.slideTo(page - 1);
+                    setCurrentPage(page);
+                  }
+                }}
+              />
             </div>
           </>
         )}
