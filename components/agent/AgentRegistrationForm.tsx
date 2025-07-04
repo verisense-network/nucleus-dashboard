@@ -413,6 +413,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setEndpointUrlError(`Failed to load: ${errorMessage}`);
     } finally {
+      setIsLoadedAgentCard(true);
       setIsLoadingAgentCard(false);
       toast.dismiss();
     }
@@ -436,6 +437,8 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
     fetchAgentCard();
   }, [agentCardId, endpoint, loadAgentCardFromEndpoint, isLoadedAgentCard]);
 
+  const actionButtonText = isLoading ? "Loading..." : agentCardId ? "Update" : "Register";
+
   return (
     <div className="mx-auto space-y-6">
       <div className="flex justify-end gap-2">
@@ -448,7 +451,10 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
           </Button>
         </Link>
       </div>
-      {agentCardId && <Alert color="warning">Updating Agent Card: {agentCardId}</Alert>}
+      {agentCardId && <Alert color="warning">
+        <span>Updating AgentCard: {watch("name")}</span>
+        <span className="text-sm text-gray-500">{agentCardId}</span>
+      </Alert>}
       <Card>
         <CardHeader>
           <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -1415,7 +1421,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                 isLoading={isLoading}
                 isDisabled={isLoading}
               >
-                {isLoading ? 'Registering...' : 'Register Agent'}
+                {actionButtonText}
               </Button>
             </div>
           </form>
