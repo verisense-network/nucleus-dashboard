@@ -5,15 +5,17 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { Divider } from "@heroui/divider";
-import { ArrowLeft, Server, ExternalLink, Globe, FileText } from "lucide-react";
+import { ArrowLeft, Server, ExternalLink, Globe, FileText, Copy } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useHydrationEndpointStore } from "@/stores/endpoint";
-import { Spinner } from "@heroui/react";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
 import { McpServer } from "@/types/mcp";
 import { wrapApiRequest } from "@/utils/api";
-import { getMcpServerByIdAPI } from "@/api/rpc";
+import { deregisterMcp, getMcpServerByIdAPI } from "@/api/rpc";
+import { toast } from "react-toastify";
+import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
+import { useRouter } from "next/navigation";
 
 interface McpDetailPageProps {
   params: Promise<{
@@ -24,11 +26,15 @@ interface McpDetailPageProps {
 export default function McpDetailPage({ params }: McpDetailPageProps) {
   const { mcpId } = use(params);
   const [{ endpoint, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
-  const router = useRouter();
+  const { selectedAddress } = usePolkadotWalletStore();
 
   const [mcpServer, setMcpServer] = useState<McpServer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOpenDeleteModal, setIsOpenDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const router = useRouter();
 
   useEffect(() => {
     if (!hydrated) return;
@@ -57,6 +63,40 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
 
     fetchMcpServer();
   }, [endpoint, mcpId, hydrated, isLocalNode]);
+
+  const handleCopyUrl = useCallback(() => {
+    if (mcpServer?.url) {
+      navigator.clipboard.writeText(mcpServer.url);
+      toast.success("MCP Server URL copied to clipboard");
+    }
+  }, [mcpServer]);
+
+  const onDelete = useCallback(async () => {
+    if (!mcpServer) return;
+
+    setIsDeleting(true);
+    const toastId = toast.loading('Deleting...');
+    try {
+      const res = await deregisterMcp(endpoint, mcpServer.id, toastId);
+      toast.update(toastId, {
+        type: 'success',
+        render: `MCP Server deleted! Transaction finalized: ${res.slice(0, 10)}...`,
+        isLoading: false,
+      });
+      router.push("/");
+      setIsOpenDeleteModal(false);
+    } catch (error) {
+      console.error(error);
+      toast.update(toastId, {
+        type: 'error',
+        render: error instanceof Error ? error.message : "Unknown error",
+        isLoading: false,
+      });
+    } finally {
+      setIsDeleting(false);
+      toast.dismiss();
+    }
+  }, [endpoint, mcpServer, router]);
 
   if (error) {
     return (
@@ -99,14 +139,8 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
     );
   }
 
-  if (!mcpServer) {
-    router.push(`/mcp/${mcpId}/not-found`);
-    return null;
-  }
-
   return (
     <div className="w-full mx-auto py-4 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <Link href="/">
           <Button variant="ghost" startContent={<ArrowLeft size={16} />}>
@@ -115,26 +149,33 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
         </Link>
       </div>
 
-      {/* MCP Server Info Card */}
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Server className="w-6 h-6 text-primary" />
+          <div className="flex justify-between items-center gap-3 w-full">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Server className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-2xl font-bold">{mcpServer?.name}</h1>
+                <div className="flex items-center gap-2 mt-1">
+                  <Chip variant="flat" color="primary" size="sm">
+                    MCP Server
+                  </Chip>
+                </div>
+              </div>
             </div>
             <div>
-              <h1 className="text-2xl font-bold">{mcpServer.name}</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <Chip variant="flat" color="primary" size="sm">
-                  MCP Server
-                </Chip>
-              </div>
+              {mcpServer?.provider === selectedAddress && (
+                <Button color="danger" onPress={() => setIsOpenDeleteModal(true)}>
+                  Delete
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
 
         <CardBody className="space-y-6">
-          {/* Basic Information */}
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <FileText size={20} />
@@ -142,14 +183,13 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
             </h3>
             <div className="bg-default-50 rounded-lg p-4">
               <p className="text-default-700">
-                {mcpServer.description || "No description available"}
+                {mcpServer?.description || "No description available"}
               </p>
             </div>
           </div>
 
           <Divider />
 
-          {/* Server URL */}
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Globe size={20} />
@@ -158,19 +198,16 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
             <div className="bg-default-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-mono bg-default-100 px-2 py-1 rounded">
-                  {mcpServer.url}
+                  {mcpServer?.url}
                 </code>
-                {mcpServer.url && (
+                {mcpServer?.url && (
                   <Button
                     size="sm"
                     variant="flat"
-                    startContent={<ExternalLink size={14} />}
-                    as="a"
-                    href={mcpServer.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    startContent={<Copy size={14} />}
+                    onPress={handleCopyUrl}
                   >
-                    Open
+                    Copy URL
                   </Button>
                 )}
               </div>
@@ -179,7 +216,6 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
 
           <Divider />
 
-          {/* Server ID */}
           <div>
             <h3 className="text-lg font-semibold mb-3">Server ID</h3>
             <div className="bg-default-50 rounded-lg p-4">
@@ -190,6 +226,19 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
           </div>
         </CardBody>
       </Card>
+      <Modal isOpen={isOpenDeleteModal} onOpenChange={setIsOpenDeleteModal}>
+        <ModalContent>
+          <ModalHeader>
+            <h3 className="text-lg font-semold">Delete MCP Server</h3>
+          </ModalHeader>
+          <ModalBody>
+            <p>Are you sure you want to delete this MCP Server?</p>
+          </ModalBody>
+          <ModalFooter>
+            <Button color="danger" onPress={() => onDelete()} isLoading={isDeleting}>Delete</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import NucleusList from "@/components/home/NucleusList";
 import AgentList from "@/components/home/AgentList";
+import McpList from "@/components/home/McpList";
 import NodeDetail from "@/components/home/NodeDetail";
 
 export default function Home() {
@@ -10,6 +11,9 @@ export default function Home() {
       </div>
       <div className="w-full">
         <AgentList />
+      </div>
+      <div className="w-full">
+        <McpList />
       </div>
       <div className="w-full">
         <NucleusList />

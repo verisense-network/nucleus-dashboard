@@ -1,15 +1,15 @@
 "use client";
 
 import { Card, CardBody } from "@heroui/card";
-import AgentCard from "./components/AgentCard";
+import McpCard from "./components/McpCard";
 import { Button, Chip, Pagination as PaginationComponent } from "@heroui/react";
 import Link from "next/link";
-import { AgentInfo, getAgentList } from "@/app/actions";
+import { getMcpServerList } from "@/app/actions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEndpointStore } from "@/stores/endpoint";
 import { cn, Input, Spinner } from "@heroui/react";
 import { wrapApiRequest } from "@/utils/api";
-import { getAgentListAPI } from "@/api/rpc";
+import { getMcpServerListAPI } from "@/api/rpc";
 import { Search } from "lucide-react";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import type { Swiper as SwiperType } from 'swiper';
@@ -19,14 +19,15 @@ import 'swiper/css';
 import 'swiper/css/grid';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
+import { McpServer } from "@/types/mcp";
 
 export const ListboxWrapper = ({ children }: { children: React.ReactNode }) => (
   <div className="w-full px-1 py-2 rounded-small">{children}</div>
 );
 
-export default function AgentList() {
+export default function McpList() {
   const { endpoint, status: endpointStatus, isLocalNode } = useEndpointStore();
-  const [agentList, setAgentList] = useState<AgentInfo[]>([]);
+  const [mcpServerList, setMcpServerList] = useState<McpServer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -36,14 +37,14 @@ export default function AgentList() {
   const swiperRef = useRef<SwiperType | null>(null);
 
   useEffect(() => {
-    const fetchAgentList = async () => {
+    const fetchMcpServerList = async () => {
       if (endpointStatus !== "connected") {
         return;
       }
 
       try {
         setIsLoading(true);
-        const result = await wrapApiRequest(getAgentList.bind(null, endpoint), getAgentListAPI.bind(null, endpoint), isLocalNode(endpoint));
+        const result = await wrapApiRequest(getMcpServerList.bind(null, endpoint), getMcpServerListAPI.bind(null, endpoint), isLocalNode(endpoint));
 
         if (!result.success) {
           setError(result.message || "Unknown error");
@@ -51,7 +52,7 @@ export default function AgentList() {
         }
 
         if (result.data) {
-          setAgentList(result.data);
+          setMcpServerList(result.data);
         }
       } catch (error) {
         console.error(error);
@@ -60,8 +61,8 @@ export default function AgentList() {
         setIsLoading(false);
       }
     };
-    fetchAgentList();
-  }, [endpoint, endpointStatus]);
+    fetchMcpServerList();
+  }, [endpoint, endpointStatus, isLocalNode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -86,24 +87,23 @@ export default function AgentList() {
     return heights[0];
   };
 
-  const filteredAgentList = useMemo(() => {
+  const filteredMcpServerList = useMemo(() => {
     if (search === "") {
-      return agentList;
+      return mcpServerList;
     }
 
-    return agentList.filter((agent) =>
-      agent.agentCard?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      agent.agentCard?.description?.toLowerCase().includes(search.toLowerCase()) ||
-      agent.agentCard?.skills?.some((skill) => [skill.name?.toLowerCase(), skill.description?.toLowerCase(), skill.tags?.join(", ")?.toLowerCase()].some((text) => text?.includes(search.toLowerCase())))
+    return mcpServerList.filter((server) =>
+      server?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      server?.description?.toLowerCase().includes(search.toLowerCase())
     );
-  }, [agentList, search]);
+  }, [mcpServerList, search]);
 
   const calculateTotalPages = useMemo(() => {
-    if (filteredAgentList.length === 0) return 1;
+    if (filteredMcpServerList.length === 0) return 1;
 
     const itemsPerPage = windowWidth >= 1024 ? 8 : 4;
-    return Math.ceil(filteredAgentList.length / itemsPerPage);
-  }, [filteredAgentList.length, windowWidth]);
+    return Math.ceil(filteredMcpServerList.length / itemsPerPage);
+  }, [filteredMcpServerList.length, windowWidth]);
 
   useEffect(() => {
     setTotalPages(calculateTotalPages);
@@ -136,20 +136,15 @@ export default function AgentList() {
     <>
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h2 className="text-lg mb-4 md:mb-0 flex items-center gap-2">
-          Agents <Chip size="sm">{agentList.length}</Chip>
+          MCPs <Chip size="sm">{mcpServerList.length}</Chip>
         </h2>
         <div className="flex flex-wrap items-center gap-4">
           <div>
-            <Input startContent={<Search className="w-4 h-4" />} placeholder="Search Agent" size="sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input startContent={<Search className="w-4 h-4" />} placeholder="Search MCP" size="sm" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm">
-              <Link href="https://space.verisense.network" target="_blank">
-                Sensespace
-              </Link>
-            </Button>
             <Button size="sm" color="primary">
-              <Link href="/register/agent">Register Agent</Link>
+              <Link href="/register/mcp">Register MCP</Link>
             </Button>
           </div>
         </div>
@@ -159,10 +154,10 @@ export default function AgentList() {
           <div className="w-full mx-auto">
             <Spinner />
           </div>
-        ) : agentList.length === 0 ? (
+        ) : mcpServerList.length === 0 ? (
           <Card>
             <CardBody>
-              <p className="text-default-500 text-center">No Agent data</p>
+              <p className="text-default-500 text-center">No MCP Server data</p>
             </CardBody>
           </Card>
         ) : (
@@ -179,9 +174,9 @@ export default function AgentList() {
               }}
               modules={[Grid, Pagination, Navigation]}
               grid={{
-                rows: Math.min(4, Math.ceil(filteredAgentList.length / 2)),
+                rows: Math.min(4, Math.ceil(filteredMcpServerList.length / 2)),
               }}
-              className={cn("w-full", getGridHeight(filteredAgentList.length))}
+              className={cn("w-full", getGridHeight(filteredMcpServerList.length))}
               onSwiper={(swiper) => {
                 swiperRef.current = swiper;
                 setCurrentPage(swiper.activeIndex + 1);
@@ -216,9 +211,9 @@ export default function AgentList() {
               }}
             >
               {
-                filteredAgentList.map((agent) => (
-                  <SwiperSlide key={`${agent.agentId}-${agent.ownerId}`} className="flex justify-center items-center">
-                    <AgentCard agent={agent} showLink={true} />
+                filteredMcpServerList.map((server) => (
+                  <SwiperSlide key={`${server.name}-${server.url}`} className="flex justify-center items-center">
+                    <McpCard mcpServer={server} showLink={true} />
                   </SwiperSlide>
                 ))}
             </Swiper>

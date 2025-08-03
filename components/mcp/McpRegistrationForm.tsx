@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Button, CardHeader } from '@heroui/react';
 import { Card, CardBody } from '@heroui/react';
 import { Input, Textarea } from '@heroui/react';
-import { FileText } from 'lucide-react';
 import { McpServer } from '@/types/mcp';
 import Link from 'next/link';
 
@@ -14,19 +13,10 @@ interface McpRegistrationFormProps {
   isLoading?: boolean;
 }
 
-const testData: McpServer = {
-  "name": "Test MCP Server",
-  "description": "This is a test MCP server for demonstration purposes",
-  "url": "https://example.com/mcp"
-};
-
 export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
   onSubmit,
   isLoading = false,
 }) => {
-  const [jsonInput, setJsonInput] = useState('');
-  const [jsonError, setJsonError] = useState('');
-
   const {
     control,
     handleSubmit,
@@ -45,40 +35,12 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
     reset();
   };
 
-  const parseJsonData = () => {
-    try {
-      setJsonError('');
-      const parsedData = JSON.parse(jsonInput);
-
-      if (!parsedData || typeof parsedData !== 'object') {
-        throw new Error('Invalid JSON format');
-      }
-
-      // Validate required fields
-      if (!parsedData.name || !parsedData.description || !parsedData.url) {
-        throw new Error('Missing required fields: name, description, and url are required');
-      }
-
-      reset(parsedData);
-      setJsonInput('');
-    } catch (error) {
-      setJsonError(error instanceof Error ? error.message : 'Invalid JSON format');
-    }
-  };
-
-  const parseTestData = () => {
-    setJsonInput(JSON.stringify(testData, null, 2));
-    parseJsonData();
-  };
-
   const clearForm = () => {
     reset({
       name: '',
       description: '',
       url: '',
     });
-    setJsonInput('');
-    setJsonError('');
   };
 
   return (
@@ -93,59 +55,6 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
           </Button>
         </Link>
       </div>
-
-      <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <FileText size={20} />
-            Import MCP Server Configuration
-          </h3>
-        </CardHeader>
-        <CardBody>
-          <div className="space-y-4">
-            <Textarea
-              label="From MCP Server JSON"
-              labelPlacement='outside'
-              placeholder="Paste your MCP Server JSON here..."
-              value={jsonInput}
-              onChange={(e) => setJsonInput(e.target.value)}
-              minRows={6}
-              isInvalid={!!jsonError}
-              errorMessage={jsonError}
-              description="Support MCP Server JSON format data with name, description, and url fields"
-            />
-
-            <div className="flex gap-2">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={parseJsonData}
-                disabled={!jsonInput.trim() || isLoading}
-              >
-                Parse
-              </Button>
-
-              <Button
-                color="warning"
-                variant="flat"
-                onPress={clearForm}
-              >
-                Clear Form
-              </Button>
-
-              {process.env.NODE_ENV === 'development' && (
-                <Button
-                  color="secondary"
-                  variant="flat"
-                  onPress={parseTestData}
-                >
-                  Load Test Data
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardBody>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -214,7 +123,17 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
               />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-between">
+              <Button
+                type="button"
+                color="warning"
+                variant="flat"
+                onPress={clearForm}
+                disabled={isLoading}
+              >
+                Clear Form
+              </Button>
+
               <Button
                 type="submit"
                 color="primary"

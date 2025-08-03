@@ -15,7 +15,7 @@ import { User } from "@heroui/user";
 import { AddressViewFormat } from "@/utils/format";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { use, useEffect, useState } from "react";
-import { useEndpointStore, useHydrationEndpointStore } from "@/stores/endpoint";
+import { useHydrationEndpointStore } from "@/stores/endpoint";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
 import { toast } from "react-toastify";
 import { deleteAgent, getAgentByIdAPI } from "@/api/rpc";

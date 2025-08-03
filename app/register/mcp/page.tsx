@@ -16,7 +16,6 @@ export default function McpRegistrationPage() {
   const handleSubmit = async (data: McpServer) => {
     setIsLoading(true);
     const toastId = toast.loading('Continue in your wallet...');
-    console.log('MCP Server data:', data);
     try {
       const { isConnected, selectedAccount } = usePolkadotWalletStore.getState();
 

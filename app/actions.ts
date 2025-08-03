@@ -123,7 +123,7 @@ export async function getMcpServerList(endpoint: string): Promise<McpServerListR
     const data = await getMcpServerListAPI(endpoint);
     return {
       success: true,
-      data: data as unknown as McpServer[],
+      data: data,
     };
   } catch (e: any) {
     console.error("getMcpServerList error", e);
@@ -137,9 +137,10 @@ export async function getMcpServerList(endpoint: string): Promise<McpServerListR
 export async function getMcpServerById(endpoint: string, serverId: string): Promise<APIResponse<McpServer>> {
   try {
     const data = await getMcpServerByIdAPI(endpoint, serverId);
+    console.log("MCP Server Data:", data);
     return {
       success: true,
-      data: data as unknown as McpServer,
+      data: data,
     };
   } catch (e: any) {
     console.error("getMcpServerById error", e);

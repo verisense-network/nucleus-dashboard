@@ -119,26 +119,72 @@ export async function deleteAgent(endpoint: string, agentId: string, toastId: Id
 export async function getAgentListAPI(endpoint: string): Promise<AgentCard[]> {
   const api = await getPolkadotApi(endpoint);
 
-  const result = await api.call.a2aRuntimeApi.getAllAgents();
+  const result = await api.call.a2aRuntimeApi?.getAllAgents();
+  if (!result) {
+    throw new Error('A2A runtime API not available or getAllAgents method not found');
+  }
   return result.toHuman() as unknown as AgentCard[];
 }
 
 export async function getAgentByIdAPI(endpoint: string, agentId: string): Promise<AgentCard> {
   const api = await getPolkadotApi(endpoint);
   const result = await api.call.a2aRuntimeApi?.findAgent(agentId);
+  if (!result) {
+    throw new Error('A2A runtime API not available or findAgent method not found');
+  }
   return result.toHuman() as unknown as AgentCard;
 }
 
 export async function getMcpServerListAPI(endpoint: string): Promise<McpServer[]> {
   const api = await getPolkadotApi(endpoint);
-  const result = await api.call.mcpRuntimeApi.getAllServers();
-  return result.toHuman() as unknown as McpServer[];
+  const entries = await api.query.mcp.servers.entries();
+
+  const servers = entries.map(([key, value]) => {
+    const serverId = key.args[0].toString();
+
+    const serverInfo = value.toHuman() as unknown;
+    const typedServerInfo = serverInfo as {
+      name: string;
+      description: string;
+      url: string;
+      provider: string;
+    };
+
+    return {
+      id: serverId,
+      name: typedServerInfo.name,
+      description: typedServerInfo.description,
+      url: typedServerInfo.url,
+      provider: typedServerInfo.provider,
+    } as McpServer;
+  });
+
+  return servers;
 }
 
 export async function getMcpServerByIdAPI(endpoint: string, serverId: string): Promise<McpServer> {
   const api = await getPolkadotApi(endpoint);
-  const result = await api.call.mcpRuntimeApi.findServer(serverId);
-  return result.toHuman() as unknown as McpServer;
+  const result = await api.query.mcp.servers(serverId);
+
+  const humanResult = result.toHuman();
+  if (!humanResult) {
+    throw new Error(`MCP server with ID ${serverId} not found`);
+  }
+
+  const typedServerInfo = humanResult as {
+    name: string;
+    description: string;
+    url: string;
+    provider: string;
+  };
+
+  return {
+    id: serverId,
+    name: typedServerInfo.name,
+    description: typedServerInfo.description,
+    url: typedServerInfo.url,
+    provider: typedServerInfo.provider,
+  } as McpServer;
 }
 
 export async function registerMcp(endpoint: string, mcpServer: McpServer, toastId: Id): Promise<string> {
