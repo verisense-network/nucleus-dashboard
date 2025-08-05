@@ -152,7 +152,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
                   <div className="flex items-start gap-2 mt-1">
                     <div className="flex flex-col items-end flex-1">
                       <span
-                        className={cn('text-sm text-default-500 max-w-4xl', {
+                        className={cn('text-sm text-default-500 max-w-4xl whitespace-break-spaces', {
                           'line-clamp-2': !isDescriptionExpanded
                         })}
                       >

@@ -24,7 +24,7 @@ export default function McpCard({ mcpServer, showLink = true }: McpCardProps) {
       </CardHeader>
       <CardBody className="flex justify-between pt-0">
         <div className="flex flex-col gap-1 h-full">
-          <ScrollShadow className="h-full text-sm text-default-500">
+          <ScrollShadow className="h-full text-sm text-default-500 whitespace-break-spaces">
             {serverCard.description}
           </ScrollShadow>
         </div>
