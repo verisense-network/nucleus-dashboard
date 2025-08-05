@@ -149,7 +149,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
                 <div className="flex flex-col">
                   <h1 className="text-2xl font-bold">{mcpServer?.name}</h1>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm text-default-500">
+                    <span className="text-sm text-default-500 max-w-4xl line-clamp-2">
                       {mcpServer?.description}
                     </span>
                     {mcpServer?.error && (

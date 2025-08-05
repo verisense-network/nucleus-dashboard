@@ -2,6 +2,21 @@ import { getPolkadotApi } from "@/lib/polkadotApi";
 import { AgentCard } from "@/types/a2a";
 import { McpServer } from "@/types/mcp";
 import { Id, toast } from "react-toastify";
+import { compressString, decompressString } from "@/utils/compressString";
+
+function processDescriptionFromChain(description: string): string {
+  if (description.startsWith('0x') && description.length > 10) {
+    try {
+      const hexString = description.slice(2);
+      const compressed = new Uint8Array(hexString.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+      return decompressString(compressed);
+    } catch (error) {
+      console.error('Failed to decompress description:', error);
+      return description;
+    }
+  }
+  return description;
+}
 
 export async function registerAgent(endpoint: string, agentCard: AgentCard, toastId: Id, updateAgentId?: string | null): Promise<string> {
   const [
@@ -153,7 +168,7 @@ export async function getMcpServerListAPI(endpoint: string): Promise<McpServer[]
     return {
       id: serverId,
       name: typedServerInfo.name,
-      description: typedServerInfo.description,
+      description: processDescriptionFromChain(typedServerInfo.description),
       url: typedServerInfo.url,
       provider: typedServerInfo.provider,
     } as McpServer;
@@ -181,7 +196,7 @@ export async function getMcpServerByIdAPI(endpoint: string, serverId: string): P
   return {
     id: serverId,
     name: typedServerInfo.name,
-    description: typedServerInfo.description,
+    description: processDescriptionFromChain(typedServerInfo.description),
     url: typedServerInfo.url,
     provider: typedServerInfo.provider,
   } as McpServer;
@@ -199,7 +214,15 @@ export async function registerMcp(endpoint: string, mcpServer: McpServer, toastI
   const api = await getPolkadotApi(endpoint);
   await setupSigner(api);
 
-  const extrinsic = api.tx.mcp.register(mcpServer.name, mcpServer.description, mcpServer.url);
+  const maxDescriptionLength = 256;
+  let processedDescription = mcpServer.description;
+
+  if (new TextEncoder().encode(mcpServer.description).length > maxDescriptionLength) {
+    const compressed = compressString(mcpServer.description);
+    processedDescription = `0x${Array.from(compressed).map(b => b.toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  const extrinsic = api.tx.mcp.register(mcpServer.name, processedDescription, mcpServer.url);
 
   const account = usePolkadotWalletStore.getState().selectedAccount;
 
