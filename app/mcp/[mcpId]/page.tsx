@@ -4,10 +4,10 @@ import { getMcpServerDetails } from "@/app/actions";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
-import { ArrowLeft, Server } from "lucide-react";
+import { ArrowLeft, Server, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
-import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
+import { cn, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
 import { McpServerDetails } from "@/types/mcp";
 import { toast } from "react-toastify";
 import { ENDPOINT } from "@/config/endpoint";
@@ -34,6 +34,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isOpenDeleteModal, setIsOpenDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const fetchMcpServer = useCallback(async (showSpinner = true) => {
     try {
@@ -142,16 +143,39 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center gap-3 w-full">
             <div className="flex justify-between items-center gap-3 w-full">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
+              <div className="flex gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg w-10 h-10 mt-2">
                   <Server className="w-6 h-6 text-primary" />
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-2xl font-bold">{mcpServer?.name}</h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm text-default-500 max-w-4xl line-clamp-2">
-                      {mcpServer?.description}
-                    </span>
+                  <div className="flex items-start gap-2 mt-1">
+                    <div className="flex flex-col flex-1">
+                      <span
+                        className={cn('text-sm text-default-500 max-w-4xl', {
+                          'line-clamp-2': !isDescriptionExpanded
+                        })}
+                      >
+                        {mcpServer?.description}
+                      </span>
+                      {mcpServer?.description && mcpServer.description.length > 100 && (
+                        <Button
+                          variant="light"
+                          size="sm"
+                          className="w-fit mt-1 text-xs h-6 px-2"
+                          startContent={
+                            isDescriptionExpanded ? (
+                              <ChevronUp size={12} />
+                            ) : (
+                              <ChevronDown size={12} />
+                            )
+                          }
+                          onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                        >
+                          {isDescriptionExpanded ? "Show Less" : "Show More"}
+                        </Button>
+                      )}
+                    </div>
                     {mcpServer?.error && (
                       <Chip variant="flat" color="warning" size="sm">
                         Connection Error
