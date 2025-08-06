@@ -14,7 +14,8 @@ import {
   Tab,
   Spinner,
   Accordion,
-  AccordionItem
+  AccordionItem,
+  Kbd
 } from '@heroui/react';
 import {
   CheckCircle,
@@ -115,10 +116,10 @@ export function McpServerSDKDisplay({ server, autoFetch = true }: McpServerSDKDi
 
         <CardBody>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-2">
               <div className="space-y-1">
                 <p className="text-sm text-default-600">Server Address</p>
-                <Code className="text-xs">{server.url}</Code>
+                <Kbd className="text-xs truncate">{server.url}</Kbd>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -271,7 +272,7 @@ export function McpServerSDKDisplay({ server, autoFetch = true }: McpServerSDKDi
                           <div className="flex-1">
                             <h5 className="font-semibold">{tool.title || tool.name}</h5>
                             <p className="text-sm text-default-600 mt-1">{tool.description}</p>
-                            {tool.inputSchema && (
+                            {tool.inputSchema && Object.keys(tool?.inputSchema?.properties || {}).length > 0 && (
                               <div className="mt-3">
                                 <Accordion
                                   variant="light"
