@@ -90,7 +90,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto py-4">
         <div className="mb-6">
           <Link href="/">
             <Button variant="ghost" startContent={<ArrowLeft size={16} />}>
@@ -110,7 +110,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto py-4">
         <div className="mb-6">
           <Link href="/">
             <Button variant="ghost" startContent={<ArrowLeft size={16} />}>
@@ -130,7 +130,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
   }
 
   return (
-    <div className="container mx-auto px-4  py-4 space-y-6">
+    <div className="container mx-auto py-4 space-y-6">
       <div className="flex items-center justify-between">
         <Link href="/">
           <Button variant="ghost" startContent={<ArrowLeft size={16} />}>
