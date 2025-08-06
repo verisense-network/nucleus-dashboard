@@ -1,6 +1,6 @@
 "use client";
 
-import { getMcpServerDetails } from "@/app/actions";
+import { getMcpServerById } from "@/app/actions";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
@@ -8,7 +8,7 @@ import { ArrowLeft, Server, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { cn, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
-import { McpServerDetails } from "@/types/mcp";
+import { McpServer, McpServerDetails } from "@/types/mcp";
 import { toast } from "react-toastify";
 import { ENDPOINT } from "@/config/endpoint";
 import { McpServerSDKDisplay } from "@/components/mcp";
@@ -29,7 +29,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
   const [{ endpoint, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
   const { selectedAddress } = usePolkadotWalletStore();
 
-  const [mcpServer, setMcpServer] = useState<McpServerDetails | null>(null);
+  const [mcpServer, setMcpServer] = useState<McpServer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpenDeleteModal, setIsOpenDeleteModal] = useState(false);
@@ -43,7 +43,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
       }
       setError(null);
 
-      const result = await getMcpServerDetails(ENDPOINT, mcpId);
+      const result = await getMcpServerById(ENDPOINT, mcpId);
 
       if (result.success && result.data) {
         setMcpServer(result.data);
@@ -152,7 +152,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
                   <div className="flex items-start gap-2 mt-1">
                     <div className="flex flex-col items-end flex-1">
                       <span
-                        className={cn('text-sm text-default-500 max-w-4xl whitespace-break-spaces', {
+                        className={cn('text-sm text-default-500 whitespace-break-spaces', {
                           'line-clamp-2': !isDescriptionExpanded
                         })}
                       >
@@ -176,11 +176,6 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
                         </Button>
                       )}
                     </div>
-                    {mcpServer?.error && (
-                      <Chip variant="flat" color="warning" size="sm">
-                        Connection Error
-                      </Chip>
-                    )}
                   </div>
                 </div>
               </div>
