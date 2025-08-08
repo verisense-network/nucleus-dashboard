@@ -101,7 +101,7 @@ export default function NodeDetail() {
       {
         name: "Total Accounts",
         render: (networkStats: NetworkStats) => (
-          <span>{(5275).toLocaleString()}</span>
+          <span>{networkStats.totalAccounts.toLocaleString()}</span>
         ),
       },
       {
