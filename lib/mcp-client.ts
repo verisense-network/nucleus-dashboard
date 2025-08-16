@@ -208,7 +208,7 @@ export class McpClient {
       }));
     } catch (error) {
       console.error('Failed to list prompts:', error);
-      throw new Error(`Failed to list prompts: ${error}`);
+      return [];
     }
   }
 
@@ -262,7 +262,7 @@ export class McpClient {
       }));
     } catch (error) {
       console.error('Failed to list resources:', error);
-      throw new Error(`Failed to list resources: ${error}`);
+      return [];
     }
   }
 
