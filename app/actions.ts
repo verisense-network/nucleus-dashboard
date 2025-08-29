@@ -9,6 +9,7 @@ import { APIResponse } from "@/types/api";
 import { getAgentByIdAPI, getAgentListAPI, getMcpServerListAPI, getMcpServerByIdAPI, deregisterMcp } from "@/api/rpc";
 import { McpPrompt, McpResource, McpServer, McpServerCapabilities, McpServerDetails, McpTool } from "@/types/mcp";
 import { createMcpClient, DEFAULT_MCP_CONFIG } from "@/lib/mcp-client";
+import { updateTaskStatus, TaskUpdateResult } from "@/api/airdrop";
 
 export async function getNucleusList(endpoint: string): Promise<NucleusListResponse> {
   try {
@@ -292,4 +293,16 @@ export async function getMcpServerInfoWithSDK(mcpUrl: string): Promise<{
       error: `Failed to get server information: ${error instanceof Error ? error.message : String(error)}`
     };
   }
+}
+
+export async function updateAirdropTaskForAgent(
+  userId: string
+): Promise<TaskUpdateResult> {
+  return updateTaskStatus(userId, "register_agent", userId);
+}
+
+export async function updateAirdropTaskForMcp(
+  userId: string
+): Promise<TaskUpdateResult> {
+  return updateTaskStatus(userId, "register_mcp", userId);
 }
