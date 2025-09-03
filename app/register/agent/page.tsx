@@ -8,9 +8,12 @@ import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { useEndpointStore } from "@/stores/endpoint";
 import { registerAgent } from "@/api/rpc";
 import { Spinner } from "@heroui/react";
+import { updateAirdropTaskForAgent } from "@/app/actions";
+import TaskCompletionModal from "@/components/modal/TaskCompletionModal";
 
 export default function AgentRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showTaskCompletionModal, setShowTaskCompletionModal] = useState(false);
   const { endpoint } = useEndpointStore();
 
   const handleSubmit = async (data: AgentCard, updateAgentId?: string | null) => {
@@ -33,6 +36,19 @@ export default function AgentRegistrationPage() {
 
       const resFinalizedHash = await registerAgent(endpoint, data, toastId, updateAgentId);
 
+      if (selectedAccount.address) {
+        try {
+          const airdropResult = await updateAirdropTaskForAgent(selectedAccount.address);
+          if (airdropResult.success) {
+            setShowTaskCompletionModal(true);
+          } else {
+            console.warn('Airdrop task update failed:', airdropResult.message);
+          }
+        } catch (airdropError) {
+          console.error('Failed to update airdrop task:', airdropError);
+        }
+      }
+
       toast.update(toastId, {
         type: 'success',
         render: `Agent registration successful! Transaction finalized: ${resFinalizedHash.slice(0, 10)}...`,
@@ -40,7 +56,6 @@ export default function AgentRegistrationPage() {
         autoClose: 3500,
       });
       console.log('Transaction finalized with hash:', resFinalizedHash);
-
     } catch (error) {
       console.error('Registration failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed, please try again';
@@ -64,6 +79,11 @@ export default function AgentRegistrationPage() {
           isLoading={isLoading}
         />
       </div>
+      <TaskCompletionModal
+        isOpen={showTaskCompletionModal}
+        onClose={() => setShowTaskCompletionModal(false)}
+        taskType="agent"
+      />
     </Suspense>
   );
 }

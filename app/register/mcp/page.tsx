@@ -8,9 +8,12 @@ import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { useEndpointStore } from "@/stores/endpoint";
 import { registerMcp } from "@/api/rpc";
 import { Spinner } from "@heroui/react";
+import { updateAirdropTaskForMcp } from "@/app/actions";
+import TaskCompletionModal from "@/components/modal/TaskCompletionModal";
 
 export default function McpRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showTaskCompletionModal, setShowTaskCompletionModal] = useState(false);
   const { endpoint } = useEndpointStore();
 
   const handleSubmit = async (data: McpServer) => {
@@ -31,6 +34,19 @@ export default function McpRegistrationPage() {
       }
 
       const resFinalizedHash = await registerMcp(endpoint, data, toastId);
+
+      if (selectedAccount.address) {
+        try {
+          const airdropResult = await updateAirdropTaskForMcp(selectedAccount.address);
+          if (airdropResult.success) {
+            setShowTaskCompletionModal(true);
+          } else {
+            console.warn('Airdrop task update failed:', airdropResult.message);
+          }
+        } catch (airdropError) {
+          console.error('Failed to update airdrop task:', airdropError);
+        }
+      }
 
       toast.update(toastId, {
         type: 'success',
@@ -63,6 +79,11 @@ export default function McpRegistrationPage() {
           isLoading={isLoading}
         />
       </div>
+      <TaskCompletionModal
+        isOpen={showTaskCompletionModal}
+        onClose={() => setShowTaskCompletionModal(false)}
+        taskType="mcp"
+      />
     </Suspense>
   );
 }

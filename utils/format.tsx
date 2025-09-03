@@ -5,6 +5,8 @@ import { CHAIN } from "./chain";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { twMerge } from "tailwind-merge";
 import { ReactNode } from "react";
+import { decodeAddress } from "@polkadot/util-crypto";
+import { u8aToHex } from "@polkadot/util";
 
 interface AddressViewFormatProps {
   address: string;
@@ -85,5 +87,16 @@ export function formatAmount(
     return typeof decimal === "number"
       ? ethers.parseUnits(amt, decimal)
       : ethers.parseEther(amt);
+  }
+}
+
+export function ss58AddressToPublicKeyHex(address: string): string {
+  try {
+    const decoded = decodeAddress(address);
+    return u8aToHex(decoded);
+  } catch (error) {
+    throw new Error(
+      `Failed to convert SS58 address to public key hex: ${error}`,
+    );
   }
 }
