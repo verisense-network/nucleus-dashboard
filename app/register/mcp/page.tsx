@@ -24,13 +24,7 @@ export default function McpRegistrationPage() {
 
       if (!isConnected || !selectedAccount) {
         console.error('not connected');
-        toast.update(toastId, {
-          type: 'error',
-          render: 'please connect wallet and select account',
-          isLoading: false,
-          autoClose: 3500,
-        });
-        return;
+        throw new Error("Please connect your wallet and select an account");
       }
 
       const resFinalizedHash = await registerMcp(endpoint, data, toastId);
@@ -65,6 +59,7 @@ export default function McpRegistrationPage() {
         isLoading: false,
         autoClose: 3500,
       });
+      throw error;
     } finally {
       setIsLoading(false);
     }

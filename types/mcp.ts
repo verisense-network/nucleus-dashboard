@@ -4,6 +4,11 @@ export interface McpServer {
   description: string;
   url: string;
   provider: string;
+  priceRate?: string;
+  urlVerified: boolean,
+  logo?: string;
+  providerWebsite?: string;
+  providerName?: string;
 }
 
 // Official MCP SDK related types

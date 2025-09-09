@@ -323,7 +323,7 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
             <CardBody className="pt-0 space-y-4">
               <p className="text-default-600">{agentCard.description}</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <h4 className="font-medium mb-2">Service Provider</h4>
                   <div className="bg-default-50 rounded-lg p-3">
@@ -333,6 +333,30 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
                         {agentCard.provider.url} <ExternalLink size={12} />
                       </Link>
                     )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Service Info</h4>
+                  <div className="bg-default-50 rounded-lg p-3 space-y-2">
+                    {agent?.priceRate && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-small text-default-600">Price Rate:</span>
+                        <Chip variant="flat" color="secondary" size="sm">
+                          {agent.priceRate}x
+                        </Chip>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-small text-default-600">URL Status:</span>
+                      <Chip
+                        variant="flat"
+                        color={agent?.urlVerified ? "success" : "danger"}
+                        size="sm"
+                      >
+                        {agent?.urlVerified ? "Verified" : "Unverified"}
+                      </Chip>
+                    </div>
                   </div>
                 </div>
 

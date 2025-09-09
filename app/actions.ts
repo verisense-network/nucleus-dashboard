@@ -6,10 +6,52 @@ import { NucleusListResponse, NucleusInfo } from "@/types/nucleus";
 import { NodeDetail } from "@/types/node";
 import { AgentCard } from "@/types/a2a";
 import { APIResponse } from "@/types/api";
-import { getAgentByIdAPI, getAgentListAPI, getMcpServerListAPI, getMcpServerByIdAPI, deregisterMcp } from "@/api/rpc";
+import { getAgentByIdAPI, getAgentListAPI, getMcpServerListAPI, getMcpServerByIdAPI } from "@/api/rpc";
 import { McpPrompt, McpResource, McpServer, McpServerCapabilities, McpServerDetails, McpTool } from "@/types/mcp";
 import { createMcpClient, DEFAULT_MCP_CONFIG } from "@/lib/mcp-client";
 import { updateTaskStatus, TaskUpdateResult } from "@/api/airdrop";
+import { uploadImageWithGoogleStorage } from "@/lib/uploadImage";
+
+export async function uploadImage(formData: FormData): Promise<APIResponse<string>> {
+  try {
+    const file = formData.get('file') as File;
+
+    if (!file) {
+      return {
+        success: false,
+        message: 'No file provided',
+      };
+    }
+
+    if (!file.type.startsWith('image/')) {
+      return {
+        success: false,
+        message: 'File must be an image',
+      };
+    }
+
+    const maxSize = 1 * 1024 * 1024; // 1MB
+    if (file.size > maxSize) {
+      return {
+        success: false,
+        message: 'File size must be less than 1MB',
+      };
+    }
+
+    const imageUrl = await uploadImageWithGoogleStorage(file);
+
+    return {
+      success: true,
+      data: imageUrl,
+    };
+  } catch (error: any) {
+    console.error('Upload image error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to upload image',
+    };
+  }
+}
 
 export async function getNucleusList(endpoint: string): Promise<NucleusListResponse> {
   try {
@@ -79,6 +121,8 @@ export async function getNucleusAbi(rpcUrl: string): Promise<any> {
 }
 
 export type AgentInfo = {
+  priceRate?: string;
+  urlVerified: boolean;
   agentId: string;
   ownerId: string;
   agentCard: AgentCard;
