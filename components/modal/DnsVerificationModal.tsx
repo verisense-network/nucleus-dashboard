@@ -14,7 +14,7 @@ import {
   Chip,
   Alert,
 } from "@heroui/react";
-import { Copy, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Copy, ExternalLink } from 'lucide-react';
 import { AgentCard } from '@/types/a2a';
 import { McpServer } from '@/types/mcp';
 import {
@@ -37,7 +37,6 @@ export default function DnsVerificationModal({
   agent,
   mcp,
 }: DnsVerificationModalProps) {
-  const [selectedDomain, setSelectedDomain] = useState('');
   const [verificationInfo, setVerificationInfo] = useState<DnsVerificationInfo | null>(null);
 
   const type = agent ? 'agent' : 'mcp';
@@ -62,11 +61,9 @@ export default function DnsVerificationModal({
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedDomain('');
       setVerificationInfo(null);
 
       if (urlDomain) {
-        setSelectedDomain(urlDomain);
         generateVerificationInfo(urlDomain);
       }
     }
@@ -80,13 +77,6 @@ export default function DnsVerificationModal({
     }
   };
 
-  const handleUseUrlDomain = () => {
-    if (urlDomain) {
-      setSelectedDomain(urlDomain);
-      generateVerificationInfo(urlDomain);
-    }
-  };
-
   return (
     <Modal
       isOpen={isOpen}
@@ -97,11 +87,8 @@ export default function DnsVerificationModal({
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           <h3 className="text-lg font-semibold">
-            DNS Verification for {type === 'agent' ? 'Agent' : 'MCP Server'}
+            DNS Verification
           </h3>
-          <p className="text-sm text-default-600">
-            Verify domain ownership for &ldquo;{entityName}&rdquo;
-          </p>
         </ModalHeader>
 
         <ModalBody className="space-y-4">
@@ -150,32 +137,6 @@ export default function DnsVerificationModal({
             </CardBody>
           </Card>
 
-          <Divider />
-
-          <div className="space-y-4">
-            <h4 className="text-md font-semibold">Domain for Verification</h4>
-
-            {urlDomain && (
-              <Card>
-                <CardBody>
-                  <div className="flex justify-between items-center">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium">Use domain from URL</p>
-                      <Chip
-                        size="sm"
-                        color="default"
-                        variant="flat"
-                        className="mt-1"
-                      >
-                        {urlDomain}
-                      </Chip>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            )}
-          </div>
-
           {verificationInfo && (
             <>
               <Divider />
@@ -198,7 +159,7 @@ export default function DnsVerificationModal({
                         <p className="text-sm font-medium text-default-700">Host/Name</p>
                         <div className="flex items-center gap-2">
                           <code className="text-sm bg-default-100 px-2 py-1 rounded flex-1">
-                            {verificationInfo.subdomain}
+                            {verificationInfo.subdomain}<span className="text-zinc-500">.{verificationInfo.domain}</span>
                           </code>
                           <Button
                             size="sm"
