@@ -47,7 +47,7 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
       // Convert price multiplier (0-10) to API value (0-1000) to match Agent logic
       const processedData = {
         ...data,
-        priceRate: data.priceRate !== undefined ? Math.round(data.priceRate * 100) : undefined,
+        priceRate: data.priceRate !== undefined ? Math.round(Number(data.priceRate) * 100).toString() : undefined,
       };
 
       await onSubmit(processedData);
@@ -253,7 +253,7 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
                     }
                     isInvalid={!!errors.priceRate}
                     errorMessage={errors.priceRate?.message}
-                    value={field.value}
+                    value={field.value !== undefined ? Number(field.value) : undefined}
                     onValueChange={(value) => {
                       if (value === undefined || value === null) {
                         field.onChange(undefined);
