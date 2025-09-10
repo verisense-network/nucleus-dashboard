@@ -28,7 +28,7 @@ interface McpDetailPageProps {
 export default function McpDetailPage({ params }: McpDetailPageProps) {
   const { mcpId } = use(params);
   const router = useRouter();
-  const [{ endpoint, isLocalNode }] = useHydrationEndpointStore(state => state);
+  const [{ endpoint, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
   const { selectedAddress } = usePolkadotWalletStore();
 
   const [mcpServer, setMcpServer] = useState<McpServer | null>(null);
@@ -61,8 +61,9 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
   }, [endpoint, isLocalNode, mcpId]);
 
   useEffect(() => {
+    if (!hydrated) return;
     fetchMcpServer();
-  }, [fetchMcpServer]);
+  }, [fetchMcpServer, hydrated]);
 
   const onDelete = useCallback(async () => {
     if (!mcpServer) return;
