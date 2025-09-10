@@ -2,7 +2,7 @@
 
 import { Card, CardBody } from "@heroui/card";
 import McpCard from "./components/McpCard";
-import { Button, Chip, Pagination as PaginationComponent } from "@heroui/react";
+import { Button, Chip, Pagination as PaginationComponent, Switch } from "@heroui/react";
 import Link from "next/link";
 import { getMcpServerList } from "@/app/actions";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +20,7 @@ import 'swiper/css/grid';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 import { McpServer } from "@/types/mcp";
+import { usePolkadotWalletStore } from "../connectWallet";
 
 export const ListboxWrapper = ({ children }: { children: React.ReactNode }) => (
   <div className="w-full px-1 py-2 rounded-small">{children}</div>
@@ -27,6 +28,7 @@ export const ListboxWrapper = ({ children }: { children: React.ReactNode }) => (
 
 export default function McpList() {
   const { endpoint, status: endpointStatus, isLocalNode } = useEndpointStore();
+  const { selectedAddress } = usePolkadotWalletStore();
   const [mcpServerList, setMcpServerList] = useState<McpServer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +36,7 @@ export default function McpList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [showMyMcpsOnly, setShowMyMcpsOnly] = useState(false);
   const swiperRef = useRef<SwiperType | null>(null);
 
   useEffect(() => {
@@ -88,15 +91,21 @@ export default function McpList() {
   };
 
   const filteredMcpServerList = useMemo(() => {
-    if (search === "") {
-      return mcpServerList;
+    let filtered = mcpServerList;
+
+    if (showMyMcpsOnly && selectedAddress) {
+      filtered = filtered.filter((server) => server.provider === selectedAddress);
     }
 
-    return mcpServerList.filter((server) =>
+    if (search === "") {
+      return filtered;
+    }
+
+    return filtered.filter((server) =>
       server?.name?.toLowerCase().includes(search.toLowerCase()) ||
       server?.description?.toLowerCase().includes(search.toLowerCase())
     );
-  }, [mcpServerList, search]);
+  }, [mcpServerList, search, showMyMcpsOnly, selectedAddress]);
 
   const calculateTotalPages = useMemo(() => {
     if (filteredMcpServerList.length === 0) return 1;
@@ -136,12 +145,27 @@ export default function McpList() {
     <>
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h2 className="text-lg mb-4 md:mb-0 flex items-center gap-2">
-          MCPs <Chip size="sm">{mcpServerList.length}</Chip>
+          MCPs <Chip size="sm">{showMyMcpsOnly ? filteredMcpServerList.length : mcpServerList.length}</Chip>
+          {showMyMcpsOnly && selectedAddress && (
+            <Chip size="sm" color="primary" variant="bordered">My MCPs</Chip>
+          )}
         </h2>
         <div className="flex flex-wrap items-center gap-4">
           <div>
             <Input startContent={<Search className="w-4 h-4" />} placeholder="Search MCP" size="sm" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          {selectedAddress && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-default-600">All</span>
+              <Switch
+                size="sm"
+                isSelected={showMyMcpsOnly}
+                onValueChange={setShowMyMcpsOnly}
+                color="primary"
+              />
+              <span className="text-sm text-default-600">My</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Button size="sm" color="primary">
               <Link href="/register/mcp">Register MCP</Link>

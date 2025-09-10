@@ -4,20 +4,20 @@ import { getMcpServerById } from "@/app/actions";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
-import { ArrowLeft, Server, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Server, ChevronDown, ChevronUp, CheckCircle, XCircle, Globe } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { use, useCallback, useEffect, useState } from "react";
 import { cn, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
 import { McpServer } from "@/types/mcp";
 import { toast } from "react-toastify";
-import { ENDPOINT } from "@/config/endpoint";
 import { McpServerSDKDisplay } from "@/components/mcp";
 import { useHydrationEndpointStore } from "@/stores/endpoint";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
 import { deregisterMcp, getMcpServerByIdAPI } from "@/api/rpc";
 import { useRouter } from "next/navigation";
 import { wrapApiRequest } from "@/utils/api";
+import DnsVerificationModal from "@/components/modal/DnsVerificationModal";
 
 interface McpDetailPageProps {
   params: Promise<{
@@ -35,6 +35,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpenDeleteModal, setIsOpenDeleteModal] = useState(false);
+  const [isDnsVerificationOpen, setIsDnsVerificationOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -159,35 +160,41 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
                       onError={() => setLogoError(true)}
                     />
                   ) : (
-                    <Server className="w-6 h-6 text-primary" />
+                    <Server className="w-6 h-6 m-2 text-primary" />
                   )}
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-2xl font-bold">{mcpServer?.name}</h1>
-                  {mcpServer?.providerName && (
-                    <div className="flex items-center gap-2 text-sm text-default-600 mb-2">
-                      <span>by {mcpServer.providerName}</span>
-                      <span>
-                        {mcpServer?.priceRate !== undefined && (
-                          <Chip size="sm" color="secondary" variant="flat" className="w-fit">
-                            {mcpServer.priceRate}x
-                          </Chip>
-                        )}
-                      </span>
-                      {mcpServer?.providerWebsite && (
-                        <>
-                          <a
-                            href={mcpServer.providerWebsite}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline"
-                          >
-                            {mcpServer.providerWebsite}
-                          </a>
-                        </>
+                  <div className="flex items-center gap-2 text-sm text-default-600 mb-2">
+                    <span>by {mcpServer?.providerName || 'unknown'}</span>
+                    <Chip
+                      size="sm"
+                      variant="flat"
+                      color={mcpServer?.urlVerified ? "success" : "danger"}
+                      startContent={mcpServer?.urlVerified ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                    >
+                      {mcpServer?.urlVerified ? "Verified" : "Unverified"}
+                    </Chip>
+                    <span>
+                      {mcpServer?.priceRate !== undefined && (
+                        <Chip size="sm" color="secondary" variant="flat" className="w-fit">
+                          {mcpServer.priceRate}x
+                        </Chip>
                       )}
-                    </div>
-                  )}
+                    </span>
+                    {mcpServer?.providerWebsite && (
+                      <>
+                        <a
+                          href={mcpServer.providerWebsite}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          {mcpServer.providerWebsite}
+                        </a>
+                      </>
+                    )}
+                  </div>
                   <div className="flex items-start gap-2 mt-1">
                     <div className="flex flex-col items-end flex-1">
                       <span
@@ -220,9 +227,21 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
               </div>
               <div>
                 {mcpServer?.provider === selectedAddress && (
-                  <Button color="danger" onPress={() => setIsOpenDeleteModal(true)}>
-                    Delete
-                  </Button>
+                  <div className="flex gap-2">
+                    {!mcpServer?.urlVerified && (
+                      <Button
+                        color="secondary"
+                        variant="flat"
+                        startContent={<Globe size={16} />}
+                        onPress={() => setIsDnsVerificationOpen(true)}
+                      >
+                        DNS Verification
+                      </Button>
+                    )}
+                    <Button color="danger" onPress={() => setIsOpenDeleteModal(true)}>
+                      Delete
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
@@ -252,6 +271,12 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      <DnsVerificationModal
+        isOpen={isDnsVerificationOpen}
+        onClose={() => setIsDnsVerificationOpen(false)}
+        mcp={mcpServer ? { ...mcpServer, id: mcpId } : undefined}
+      />
     </div >
   );
 }
