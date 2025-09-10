@@ -6,16 +6,18 @@ import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { ArrowLeft, Server, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { use, useCallback, useEffect, useState } from "react";
 import { cn, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
-import { McpServer, McpServerDetails } from "@/types/mcp";
+import { McpServer } from "@/types/mcp";
 import { toast } from "react-toastify";
 import { ENDPOINT } from "@/config/endpoint";
 import { McpServerSDKDisplay } from "@/components/mcp";
 import { useHydrationEndpointStore } from "@/stores/endpoint";
 import { usePolkadotWalletStore } from "@/stores/polkadot-wallet";
-import { deregisterMcp } from "@/api/rpc";
+import { deregisterMcp, getMcpServerByIdAPI } from "@/api/rpc";
 import { useRouter } from "next/navigation";
+import { wrapApiRequest } from "@/utils/api";
 
 interface McpDetailPageProps {
   params: Promise<{
@@ -26,7 +28,7 @@ interface McpDetailPageProps {
 export default function McpDetailPage({ params }: McpDetailPageProps) {
   const { mcpId } = use(params);
   const router = useRouter();
-  const [{ endpoint, isLocalNode }, hydrated] = useHydrationEndpointStore(state => state);
+  const [{ endpoint, isLocalNode }] = useHydrationEndpointStore(state => state);
   const { selectedAddress } = usePolkadotWalletStore();
 
   const [mcpServer, setMcpServer] = useState<McpServer | null>(null);
@@ -35,6 +37,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
   const [isOpenDeleteModal, setIsOpenDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const fetchMcpServer = useCallback(async (showSpinner = true) => {
     try {
@@ -43,7 +46,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
       }
       setError(null);
 
-      const result = await getMcpServerById(ENDPOINT, mcpId);
+      const result = await wrapApiRequest(getMcpServerById.bind(null, endpoint, mcpId), getMcpServerByIdAPI.bind(null, endpoint, mcpId), isLocalNode(endpoint));
 
       if (result.success && result.data) {
         setMcpServer(result.data);
@@ -55,7 +58,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [mcpId]);
+  }, [endpoint, isLocalNode, mcpId]);
 
   useEffect(() => {
     fetchMcpServer();
@@ -144,11 +147,46 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
           <div className="flex justify-between items-center gap-3 w-full">
             <div className="flex justify-between items-center gap-3 w-full">
               <div className="flex gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg w-10 h-10 mt-2">
-                  <Server className="w-6 h-6 text-primary" />
+                <div className="bg-primary/10 rounded-lg w-10 h-10 mt-2">
+                  {mcpServer?.logo && !logoError ? (
+                    <Image
+                      src={mcpServer.logo}
+                      alt={`${mcpServer.name} logo`}
+                      width={24}
+                      height={24}
+                      className="w-full h-full object-cover rounded"
+                      onError={() => setLogoError(true)}
+                    />
+                  ) : (
+                    <Server className="w-6 h-6 text-primary" />
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-2xl font-bold">{mcpServer?.name}</h1>
+                  {mcpServer?.providerName && (
+                    <div className="flex items-center gap-2 text-sm text-default-600 mb-2">
+                      <span>by {mcpServer.providerName}</span>
+                      <span>
+                        {mcpServer?.priceRate !== undefined && (
+                          <Chip size="sm" color="secondary" variant="flat" className="w-fit">
+                            {mcpServer.priceRate}x
+                          </Chip>
+                        )}
+                      </span>
+                      {mcpServer?.providerWebsite && (
+                        <>
+                          <a
+                            href={mcpServer.providerWebsite}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            {mcpServer.providerWebsite}
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-start gap-2 mt-1">
                     <div className="flex flex-col items-end flex-1">
                       <span
@@ -216,3 +254,4 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
     </div >
   );
 }
+

@@ -14,10 +14,10 @@ const nextConfig: NextConfig = {
   },
   compiler: isProd
     ? {
-        removeConsole: {
-          exclude: ["error"],
-        },
-      }
+      removeConsole: {
+        exclude: ["error"],
+      },
+    }
     : undefined,
 };
 

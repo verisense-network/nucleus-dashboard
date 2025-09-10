@@ -2,7 +2,7 @@ import { Buffer } from "buffer";
 import storage from "./googleStorage";
 import { ArrayBuffer as SparkArrayBuffer } from "spark-md5";
 
-const bucketName = "nucleus-dashboard";
+const bucketName = "dashboard-image-bucket";
 const destination = "upload-image";
 
 export async function uploadImageWithGoogleStorage(file: File) {

@@ -3,9 +3,10 @@ import { AgentCard } from "@/types/a2a";
 import { McpServer } from "@/types/mcp";
 import { Id, toast } from "react-toastify";
 import { compressString, decompressString } from "@/utils/compressString";
+import { AgentInfo } from "@/app/actions";
 
-function processDescriptionFromChain(description: string): string {
-  if (description.startsWith('0x') && description.length > 10) {
+function processDescriptionFromChain(description?: string): string {
+  if (description?.startsWith('0x') && description.length > 10) {
     try {
       const hexString = description.slice(2);
       const compressed = new Uint8Array(hexString.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
@@ -15,10 +16,10 @@ function processDescriptionFromChain(description: string): string {
       return description;
     }
   }
-  return description;
+  return description || "";
 }
 
-export async function registerAgent(endpoint: string, agentCard: AgentCard, toastId: Id, updateAgentId?: string | null): Promise<string> {
+export async function registerAgent(endpoint: string, agentCard: AgentCard, priceRate: number | undefined, toastId: Id, updateAgentId?: string | null): Promise<string> {
   const [
     { setupSigner },
     { usePolkadotWalletStore },
@@ -30,7 +31,9 @@ export async function registerAgent(endpoint: string, agentCard: AgentCard, toas
   const api = await getPolkadotApi(endpoint);
   await setupSigner(api);
 
-  const extrinsic = updateAgentId ? api.tx.a2a.update(updateAgentId, agentCard) : api.tx.a2a.register(agentCard);
+  const extrinsic = updateAgentId
+    ? api.tx.a2a.update(updateAgentId, agentCard, priceRate)
+    : api.tx.a2a.register(agentCard, priceRate);
 
   const account = usePolkadotWalletStore.getState().selectedAccount;
 
@@ -131,38 +134,87 @@ export async function deleteAgent(endpoint: string, agentId: string, toastId: Id
   });
 }
 
-export async function getAgentListAPI(endpoint: string): Promise<AgentCard[]> {
+export async function getAgentListAPI(endpoint: string): Promise<AgentInfo[]> {
   const api = await getPolkadotApi(endpoint);
 
   const result = await api.call.a2aRuntimeApi?.getAllAgents();
   if (!result) {
     throw new Error('A2A runtime API not available or getAllAgents method not found');
   }
-  return result.toHuman() as unknown as AgentCard[];
+
+  const agents = result.toHuman() as unknown as AgentInfo[];
+
+  return agents.map(agent => {
+    const processedAgent: AgentInfo = {
+      ...agent,
+      priceRate: agent.priceRate ?
+        (typeof agent.priceRate === 'string' ?
+          parseInt(agent.priceRate.replace(/,/g, ''), 10) / 100 :
+          Number(agent.priceRate) / 100).toString() :
+        undefined,
+    };
+
+    if (agent.agentCard?.description) {
+      processedAgent.agentCard = {
+        ...agent.agentCard,
+        description: processDescriptionFromChain(agent.agentCard.description),
+      };
+    }
+
+    return processedAgent;
+  });
 }
 
-export async function getAgentByIdAPI(endpoint: string, agentId: string): Promise<AgentCard> {
+export async function getAgentByIdAPI(endpoint: string, agentId: string): Promise<AgentInfo> {
   const api = await getPolkadotApi(endpoint);
   const result = await api.call.a2aRuntimeApi?.findAgent(agentId);
   if (!result) {
     throw new Error('A2A runtime API not available or findAgent method not found');
   }
-  return result.toHuman() as unknown as AgentCard;
+
+  const agent = result.toHuman() as unknown as AgentInfo;
+
+  const processedAgent: AgentInfo = {
+    ...agent,
+    priceRate: agent.priceRate ?
+      (typeof agent.priceRate === 'string' ?
+        parseInt(agent.priceRate.replace(/,/g, ''), 10) / 100 :
+        Number(agent.priceRate) / 100).toString() :
+      undefined,
+  };
+
+  if (agent.agentCard?.description) {
+    processedAgent.agentCard = {
+      ...agent.agentCard,
+      description: processDescriptionFromChain(agent.agentCard.description),
+    };
+  }
+
+  return processedAgent;
 }
 
 export async function getMcpServerListAPI(endpoint: string): Promise<McpServer[]> {
   const api = await getPolkadotApi(endpoint);
-  const entries = await api.query.mcp.servers.entries();
+  const result = await api.call.mcpRuntimeApi?.getAllMcpServers();
+  if (!result) {
+    throw new Error('MCP runtime API not available or getAllAgents method not found');
+  }
 
-  const servers = entries.map(([key, value]) => {
-    const serverId = key.args[0].toString();
+  const mcps = result.toHuman() as unknown as [string, Omit<McpServer, "id">][];
 
-    const serverInfo = value.toHuman() as unknown;
+  return mcps.map(([key, value]) => {
+    const serverId = key;
+    const serverInfo = value;
     const typedServerInfo = serverInfo as {
       name: string;
       description: string;
       url: string;
       provider: string;
+      priceRate?: number | string;
+      logo?: string;
+      providerWebsite?: string;
+      providerName?: string;
+      urlVerified: boolean;
     };
 
     return {
@@ -171,35 +223,42 @@ export async function getMcpServerListAPI(endpoint: string): Promise<McpServer[]
       description: processDescriptionFromChain(typedServerInfo.description),
       url: typedServerInfo.url,
       provider: typedServerInfo.provider,
+      priceRate: typedServerInfo.priceRate ?
+        (typeof typedServerInfo.priceRate === 'string' ?
+          parseInt(typedServerInfo.priceRate.replace(/,/g, ''), 10) / 100 :
+          typedServerInfo.priceRate / 100) :
+        undefined,
+      logo: typedServerInfo.logo,
+      providerWebsite: typedServerInfo.providerWebsite,
+      providerName: typedServerInfo.providerName,
+      urlVerified: typedServerInfo.urlVerified,
     } as McpServer;
   });
-
-  return servers;
 }
 
 export async function getMcpServerByIdAPI(endpoint: string, serverId: string): Promise<McpServer> {
   const api = await getPolkadotApi(endpoint);
-  const result = await api.query.mcp.servers(serverId);
+  console.log("serverId", serverId)
+  const result = await api.call.mcpRuntimeApi?.findMcpServer(serverId);
 
-  const humanResult = result.toHuman();
-  if (!humanResult) {
+  if (!result) {
     throw new Error(`MCP server with ID ${serverId} not found`);
   }
 
-  const typedServerInfo = humanResult as {
-    name: string;
-    description: string;
-    url: string;
-    provider: string;
+  const mcp = result.toHuman() as unknown as McpServer;
+
+  console.log("mcp", mcp)
+
+  const processedMcp: McpServer = {
+    ...mcp,
+    priceRate: mcp.priceRate ?
+      (typeof mcp.priceRate === 'string' ?
+        parseInt(mcp.priceRate.replace(/,/g, ''), 10) / 100 :
+        Number(mcp.priceRate) / 100).toString() :
+      undefined,
   };
 
-  return {
-    id: serverId,
-    name: typedServerInfo.name,
-    description: processDescriptionFromChain(typedServerInfo.description),
-    url: typedServerInfo.url,
-    provider: typedServerInfo.provider,
-  } as McpServer;
+  return processedMcp
 }
 
 export async function registerMcp(endpoint: string, mcpServer: McpServer, toastId: Id): Promise<string> {
@@ -222,7 +281,15 @@ export async function registerMcp(endpoint: string, mcpServer: McpServer, toastI
     processedDescription = `0x${Array.from(compressed).map(b => b.toString(16).padStart(2, '0')).join('')}`;
   }
 
-  const extrinsic = api.tx.mcp.register(mcpServer.name, processedDescription, mcpServer.url);
+  const extrinsic = api.tx.mcp.register(
+    mcpServer.name,
+    processedDescription,
+    mcpServer.url,
+    mcpServer.priceRate || null,
+    mcpServer.logo || null,
+    mcpServer.providerWebsite || null,
+    mcpServer.providerName || null
+  );
 
   const account = usePolkadotWalletStore.getState().selectedAccount;
 

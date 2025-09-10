@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { Alert, Button, CardHeader } from '@heroui/react';
 import { Card, CardBody } from '@heroui/react';
-import { Input, Textarea, Select, SelectItem } from '@heroui/react';
+import { Input, Textarea, Select, SelectItem, NumberInput } from '@heroui/react';
 import { Checkbox, Switch } from '@heroui/react';
 import { Divider } from '@heroui/react';
 import { Plus, Trash2, FileText } from 'lucide-react';
@@ -34,10 +34,11 @@ interface SecurityRequirementFormData {
 interface FormData extends Omit<AgentCard, 'securitySchemes' | 'security'> {
   securitySchemesArray: SecuritySchemeFormData[];
   securityArray: SecurityRequirementFormData[];
+  priceRate?: number;
 }
 
 interface AgentRegistrationFormProps {
-  onSubmit: (data: AgentCard, updateAgentId?: string | null) => Promise<void>;
+  onSubmit: (data: AgentCard, priceRate?: number, updateAgentId?: string | null) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -154,6 +155,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       securitySchemesArray: [],
       // Convert security array to form-friendly format
       securityArray: [],
+      priceRate: undefined,
     },
   });
 
@@ -274,7 +276,10 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       }
     };
 
-    await onSubmit(agentCardData, agentCardId);
+    // Convert price multiplier (0-10) to API value (0-1000)
+    const apiPriceRate = data.priceRate !== undefined ? Math.round(data.priceRate * 100) : undefined;
+
+    await onSubmit(agentCardData, apiPriceRate, agentCardId);
     reset();
   };
 
@@ -380,6 +385,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       },
       securitySchemesArray: [],
       securityArray: [],
+      priceRate: undefined,
     });
     setJsonInput('');
     setJsonError('');
@@ -539,6 +545,51 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
               </Alert>
             </div>
             <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Price Rate</h3>
+              <Controller
+                name="priceRate"
+                control={control}
+                rules={{
+                  min: {
+                    value: 0,
+                    message: 'Price rate must be 0 or greater'
+                  },
+                  max: {
+                    value: 10,
+                    message: 'Price rate must be 10 or less'
+                  }
+                }}
+                render={({ field }) => (
+                  <NumberInput
+                    label="Price Rate"
+                    placeholder="1.0"
+                    step={0.1}
+                    min={0}
+                    max={10}
+                    endContent={
+                      <div className="pointer-events-none flex items-center">
+                        <span className="text-default-400 text-small">x</span>
+                      </div>
+                    }
+                    isInvalid={!!errors.priceRate}
+                    errorMessage={errors.priceRate?.message}
+                    description="Service price multiplier (0-10x, supports 1 decimal place). Leave empty for free service."
+                    value={field.value}
+                    onValueChange={(value) => {
+                      if (value === undefined || value === null) {
+                        field.onChange(undefined);
+                      } else {
+                        // Round to 1 decimal place
+                        const rounded = Math.round(value * 10) / 10;
+                        if (rounded >= 0 && rounded <= 10) {
+                          field.onChange(rounded);
+                        }
+                      }
+                    }}
+                  />
+                )}
+              />
+
               <h3 className="text-lg font-semibold">Basic Information</h3>
 
               <Controller
@@ -582,14 +633,14 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                   required: 'Agent URL is required',
                   pattern: {
                     value: /^https?:\/\/.+/,
-                    message: 'Please enter a valid URL (http:// or https://)'
+                    message: 'Please enter a valid URL'
                   }
                 }}
                 render={({ field }) => (
                   <Input
                     {...field}
                     label="Agent URL"
-                    placeholder="https://example.com/agent"
+                    placeholder="https://your-agent-url.com"
                     isInvalid={!!errors.url}
                     errorMessage={errors.url?.message}
                     isRequired

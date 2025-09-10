@@ -16,10 +16,11 @@ export default function AgentRegistrationPage() {
   const [showTaskCompletionModal, setShowTaskCompletionModal] = useState(false);
   const { endpoint } = useEndpointStore();
 
-  const handleSubmit = async (data: AgentCard, updateAgentId?: string | null) => {
+  const handleSubmit = async (data: AgentCard, priceRate?: number, updateAgentId?: string | null) => {
     setIsLoading(true);
     const toastId = toast.loading('Continue in your wallet...');
     console.log('data', data);
+    console.log('priceRate', priceRate);
     try {
       const { isConnected, selectedAccount } = usePolkadotWalletStore.getState();
 
@@ -34,7 +35,7 @@ export default function AgentRegistrationPage() {
         return;
       }
 
-      const resFinalizedHash = await registerAgent(endpoint, data, toastId, updateAgentId);
+      const resFinalizedHash = await registerAgent(endpoint, data, priceRate, toastId, updateAgentId);
 
       if (selectedAccount.address) {
         try {
