@@ -1,3 +1,6 @@
+import { decodeAddress } from "@polkadot/util-crypto";
+import { u8aToHex } from "@polkadot/util";
+
 export interface DnsVerificationInfo {
   subdomain: string;
   domain: string;
@@ -7,19 +10,10 @@ export interface DnsVerificationInfo {
 }
 
 export function idToHexPrefix(id: string): string {
-  const array = new Uint8Array(32);
+  const publicKeyBytes = decodeAddress(id);
 
-  const encoder = new TextEncoder();
-  const idBytes = encoder.encode(id);
-
-  for (let i = 0; i < Math.min(idBytes.length, 32); i++) {
-    array[i] = idBytes[i];
-  }
-
-  const first16Bytes = array.slice(0, 16);
-  return Array.from(first16Bytes)
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
+  const first16Bytes = publicKeyBytes.slice(0, 16);
+  return u8aToHex(first16Bytes, -1, false);
 }
 
 export function generateDnsVerificationInfo(
