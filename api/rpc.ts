@@ -238,16 +238,13 @@ export async function getMcpServerListAPI(endpoint: string): Promise<McpServer[]
 
 export async function getMcpServerByIdAPI(endpoint: string, serverId: string): Promise<McpServer> {
   const api = await getPolkadotApi(endpoint);
-  console.log("serverId", serverId)
-  const result = await api.call.mcpRuntimeApi?.findMcpServer(serverId);
 
+  const result = await api.call.mcpRuntimeApi?.findMcpServer(serverId);
   if (!result) {
     throw new Error(`MCP server with ID ${serverId} not found`);
   }
 
   const mcp = result.toHuman() as unknown as McpServer;
-
-  console.log("mcp", mcp)
 
   const processedMcp: McpServer = {
     ...mcp,
@@ -256,6 +253,7 @@ export async function getMcpServerByIdAPI(endpoint: string, serverId: string): P
         parseInt(mcp.priceRate.replace(/,/g, ''), 10) / 100 :
         Number(mcp.priceRate) / 100).toString() :
       undefined,
+    description: processDescriptionFromChain(mcp.description),
   };
 
   return processedMcp
