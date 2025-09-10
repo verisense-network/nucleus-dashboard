@@ -6,7 +6,7 @@ import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { Divider } from "@heroui/divider";
 import { Avatar } from "@heroui/avatar";
-import { ArrowLeft, Shield, Zap, FileText, ExternalLink, Key, Lock, CircleHelp } from "lucide-react";
+import { ArrowLeft, Shield, Zap, FileText, ExternalLink, Key, Lock, CircleHelp, Globe } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SecurityScheme, OAuth2SecurityScheme, APIKeySecurityScheme, HTTPAuthSecurityScheme, OpenIdConnectSecurityScheme, AgentCard } from "../../../types/a2a";
@@ -20,6 +20,7 @@ import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } fro
 import { toast } from "react-toastify";
 import { deleteAgent, getAgentByIdAPI } from "@/api/rpc";
 import { wrapApiRequest } from "@/utils/api";
+import DnsVerificationModal from "@/components/modal/DnsVerificationModal";
 
 interface AgentDetailPageProps {
   params: Promise<{
@@ -38,6 +39,7 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
   const [balance, setBalance] = useState<{ balance: string; symbol: string } | null>(null);
   const { getBalanceByAddress, selectedAddress } = usePolkadotWalletStore();
   const [isOpenDeleteAgentCard, setIsOpenDeleteAgentCard] = useState(false);
+  const [isDnsVerificationOpen, setIsDnsVerificationOpen] = useState(false);
 
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -312,6 +314,16 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
                       }}>
                         Update
                       </Button>
+                      {!agent?.urlVerified && (
+                        <Button
+                          color="secondary"
+                          variant="flat"
+                          startContent={<Globe size={16} />}
+                          onPress={() => setIsDnsVerificationOpen(true)}
+                        >
+                          DNS Verification
+                        </Button>
+                      )}
                       <Button color="danger" onPress={() => setIsOpenDeleteAgentCard(true)}>
                         Delete
                       </Button>
@@ -634,6 +646,12 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      <DnsVerificationModal
+        isOpen={isDnsVerificationOpen}
+        onClose={() => setIsDnsVerificationOpen(false)}
+        agent={agentCard && agent ? { ...agentCard, id: agentId } : undefined}
+      />
     </div>
   );
 }
