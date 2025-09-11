@@ -293,6 +293,12 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
                   <div className="flex-1">
                     <h2 className="text-xl font-semibold">{agentCard.name}</h2>
                     <p className="text-small text-default-500">Version {agentCard.version}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-default-400">ID:</span>
+                      <Chip size="sm" variant="flat" color="default" className="text-xs">
+                        {agentId}
+                      </Chip>
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-col md:flex-row items-center gap-2">

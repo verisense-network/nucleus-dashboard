@@ -195,6 +195,12 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
                       </>
                     )}
                   </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-default-400">ID:</span>
+                    <Chip size="sm" variant="flat" color="default" className="text-xs">
+                      {mcpId}
+                    </Chip>
+                  </div>
                   <div className="flex items-start gap-2 mt-1">
                     <div className="flex flex-col items-end flex-1">
                       <span
