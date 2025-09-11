@@ -1,5 +1,5 @@
 export interface McpServer {
-  id: string;
+  id?: string;
   name: string;
   description: string;
   url: string;

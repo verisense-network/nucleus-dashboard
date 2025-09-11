@@ -72,7 +72,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
     setIsDeleting(true);
     const toastId = toast.loading('Deleting...');
     try {
-      const res = await deregisterMcp(endpoint, mcpServer.id, toastId);
+      const res = await deregisterMcp(endpoint, mcpId, toastId);
       toast.update(toastId, {
         type: 'success',
         render: `MCP Server deleted! Transaction finalized: ${res.slice(0, 10)}...`,
@@ -91,7 +91,7 @@ export default function McpDetailPage({ params }: McpDetailPageProps) {
       setIsDeleting(false);
       toast.dismiss();
     }
-  }, [endpoint, mcpServer, router]);
+  }, [endpoint, mcpId, mcpServer, router]);
 
   if (error) {
     return (
