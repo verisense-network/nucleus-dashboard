@@ -31,12 +31,12 @@ export default function McpRegistrationPage() {
 
       if (selectedAccount.address) {
         try {
-          const airdropResult = await updateAirdropTaskForMcp(selectedAccount.address);
-          if (airdropResult.success) {
-            setShowTaskCompletionModal(true);
-          } else {
-            console.warn('Airdrop task update failed:', airdropResult.message);
-          }
+          // const airdropResult = await updateAirdropTaskForMcp(selectedAccount.address);
+          // if (airdropResult.success) {
+          //   setShowTaskCompletionModal(true);
+          // } else {
+          //   console.warn('Airdrop task update failed:', airdropResult.message);
+          // }
         } catch (airdropError) {
           console.error('Failed to update airdrop task:', airdropError);
         }

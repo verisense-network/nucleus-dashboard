@@ -39,12 +39,12 @@ export default function AgentRegistrationPage() {
 
       if (selectedAccount.address) {
         try {
-          const airdropResult = await updateAirdropTaskForAgent(selectedAccount.address);
-          if (airdropResult.success) {
-            setShowTaskCompletionModal(true);
-          } else {
-            console.warn('Airdrop task update failed:', airdropResult.message);
-          }
+          // const airdropResult = await updateAirdropTaskForAgent(selectedAccount.address);
+          // if (airdropResult.success) {
+          //   setShowTaskCompletionModal(true);
+          // } else {
+          //   console.warn('Airdrop task update failed:', airdropResult.message);
+          // }
         } catch (airdropError) {
           console.error('Failed to update airdrop task:', airdropError);
         }
