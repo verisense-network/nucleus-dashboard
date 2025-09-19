@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Button, CardHeader, Avatar, Spinner } from '@heroui/react';
 import { Card, CardBody } from '@heroui/react';
@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { uploadImage } from '@/app/actions';
 import { toast } from 'react-toastify';
 import { Upload } from 'lucide-react';
+import McpServerPreview from './McpServerPreview';
 
 interface McpRegistrationFormProps {
   onSubmit: (data: McpServer) => Promise<void>;
@@ -23,12 +24,17 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [mcpValidation, setMcpValidation] = useState<{
+    isValid: boolean;
+    error?: string;
+  }>({ isValid: false });
 
   const {
     control,
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<McpServer>({
     defaultValues: {
@@ -43,6 +49,11 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
   });
 
   const handleFormSubmit = async (data: McpServer) => {
+    if (!mcpValidation.isValid) {
+      toast.error(mcpValidation.error || 'Please ensure MCP server is accessible before registration');
+      return;
+    }
+
     try {
       // Convert price multiplier (0-10) to API value (0-1000) to match Agent logic
       const processedData = {
@@ -54,6 +65,7 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
       reset();
       setLogoFile(null);
       setLogoUrl(null);
+      setMcpValidation({ isValid: true });
     } catch (error) {
       console.error('Failed to submit form:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to submit form. Please try again.';
@@ -98,7 +110,14 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
     });
     setLogoFile(null);
     setLogoUrl(null);
+    setMcpValidation({ isValid: false });
   };
+
+  const handleMcpValidationChange = useCallback((isValid: boolean, error?: string) => {
+    setMcpValidation({ isValid, error });
+  }, []);
+
+  const watchedUrl = watch('url') || '';
 
   return (
     <div className="mx-auto space-y-6">
@@ -226,6 +245,11 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
                 )}
               />
 
+              <McpServerPreview
+                url={watchedUrl}
+                onValidationChange={handleMcpValidationChange}
+              />
+
               <Controller
                 name="priceRate"
                 control={control}
@@ -321,12 +345,17 @@ export const McpRegistrationForm: React.FC<McpRegistrationFormProps> = ({
 
               <Button
                 type="submit"
-                color="primary"
+                color={mcpValidation.isValid ? "primary" : "default"}
                 size="lg"
                 isLoading={isLoading}
-                disabled={isLoading}
+                disabled={isLoading || !mcpValidation.isValid}
               >
-                {isLoading ? "Registering..." : "Register MCP Server"}
+                {isLoading
+                  ? "Registering..."
+                  : mcpValidation.isValid
+                    ? "Register MCP Server"
+                    : "Server Not Verified"
+                }
               </Button>
             </div>
           </form>
