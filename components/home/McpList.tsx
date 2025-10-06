@@ -147,7 +147,7 @@ export default function McpList() {
     <>
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h2 className="text-lg mb-4 md:mb-0 flex items-center gap-2">
-          MCPs <Chip size="sm">{showMyMcpsOnly ? filteredMcpServerList.length : mcpServerList.length}</Chip>
+          MCPs <Chip size="sm">{filteredMcpServerList.length}</Chip>
           {showMyMcpsOnly && selectedAddress && (
             <Chip size="sm" color="primary" variant="bordered">My MCPs</Chip>
           )}

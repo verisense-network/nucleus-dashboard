@@ -147,7 +147,7 @@ export default function AgentList() {
     <>
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h2 className="text-lg mb-4 md:mb-0 flex items-center gap-2">
-          Agents <Chip size="sm">{showMyAgentsOnly ? filteredAgentList.length : agentList.length}</Chip>
+          Agents <Chip size="sm">{filteredAgentList.length}</Chip>
           {showMyAgentsOnly && selectedAddress && (
             <Chip size="sm" color="primary" variant="bordered">My Agents</Chip>
           )}
