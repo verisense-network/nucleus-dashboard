@@ -94,6 +94,8 @@ export default function AgentList() {
 
     if (showMyAgentsOnly && selectedAddress) {
       filtered = filtered.filter((agent) => agent.ownerId === selectedAddress);
+    } else {
+      filtered = filtered.filter((agent) => agent.urlVerified);
     }
 
     if (search === "") {

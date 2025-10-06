@@ -95,6 +95,8 @@ export default function McpList() {
 
     if (showMyMcpsOnly && selectedAddress) {
       filtered = filtered.filter((server) => server.provider === selectedAddress);
+    } else {
+      filtered = filtered.filter((server) => server.urlVerified);
     }
 
     if (search === "") {
