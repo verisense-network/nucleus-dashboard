@@ -26,6 +26,7 @@ export default function McpStatusPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [dnsVerifiedFilter, setDnsVerifiedFilter] = useState<"all" | "verified" | "unverified">("all");
   const [retryingServers, setRetryingServers] = useState<Set<string>>(new Set());
 
   const checkMcpWithRetry = async (server: McpServerWithStatus, maxRetries = 3): Promise<{
@@ -240,6 +241,12 @@ export default function McpStatusPage() {
       );
     }
 
+    if (dnsVerifiedFilter !== "all") {
+      filtered = filtered.filter((server) =>
+        dnsVerifiedFilter === "verified" ? server.urlVerified : !server.urlVerified
+      );
+    }
+
     return filtered.sort((a, b) => {
       if (a.status === "checking" && b.status !== "checking") return -1;
       if (a.status !== "checking" && b.status === "checking") return 1;
@@ -251,15 +258,16 @@ export default function McpStatusPage() {
       const bCount = b.toolCount ?? -1;
       return bCount - aCount;
     });
-  }, [mcpServers, search]);
+  }, [mcpServers, search, dnsVerifiedFilter]);
 
   const stats = useMemo(() => {
     const total = mcpServers.length;
     const available = mcpServers.filter((s) => s.status === "available").length;
     const broken = mcpServers.filter((s) => s.status === "broken").length;
     const checking = mcpServers.filter((s) => s.status === "checking").length;
+    const verified = mcpServers.filter((s) => s.urlVerified).length;
 
-    return { total, available, broken, checking };
+    return { total, available, broken, checking, verified };
   }, [mcpServers]);
 
   if (!hydrated || endpointStatus === "connecting" || isLoading) {
@@ -315,7 +323,7 @@ export default function McpStatusPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card>
             <CardBody className="text-center">
               <p className="text-sm text-default-500">Total MCPs</p>
@@ -340,16 +348,48 @@ export default function McpStatusPage() {
               <p className="text-3xl font-bold text-warning">{stats.checking}</p>
             </CardBody>
           </Card>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setDnsVerifiedFilter(dnsVerifiedFilter === "verified" ? "all" : "verified")}>
+            <CardBody className="text-center">
+              <p className="text-sm text-primary">DNS Verified</p>
+              <p className="text-3xl font-bold text-primary">{stats.verified}</p>
+            </CardBody>
+          </Card>
         </div>
 
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
           <Input
-            className="max-w-md"
+            className="flex-1 max-w-md"
             placeholder="Search by name, description, or ID..."
             startContent={<Search className="w-4 h-4" />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={dnsVerifiedFilter === "all" ? "solid" : "bordered"}
+              color={dnsVerifiedFilter === "all" ? "primary" : "default"}
+              onPress={() => setDnsVerifiedFilter("all")}
+            >
+              All
+            </Button>
+            <Button
+              size="sm"
+              variant={dnsVerifiedFilter === "verified" ? "solid" : "bordered"}
+              color={dnsVerifiedFilter === "verified" ? "success" : "default"}
+              onPress={() => setDnsVerifiedFilter("verified")}
+            >
+              DNS Verified
+            </Button>
+            <Button
+              size="sm"
+              variant={dnsVerifiedFilter === "unverified" ? "solid" : "bordered"}
+              color={dnsVerifiedFilter === "unverified" ? "warning" : "default"}
+              onPress={() => setDnsVerifiedFilter("unverified")}
+            >
+              Not Verified
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -389,8 +429,17 @@ export default function McpStatusPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <p className="font-semibold">{server.name}</p>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold">{server.name}</p>
+                          {server.urlVerified && (
+                            <Tooltip content="DNS has been verified">
+                              <Chip size="sm" variant="flat" color="success" startContent={<CheckCircle className="w-3 h-3" />}>
+                                Verified
+                              </Chip>
+                            </Tooltip>
+                          )}
+                        </div>
                         <p className="text-sm text-default-500 truncate max-w-xs">{server.description}</p>
                       </div>
                     </TableCell>
