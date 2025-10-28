@@ -2,7 +2,7 @@
 
 import { Card, CardBody } from "@heroui/card";
 import AgentCard from "./components/AgentCard";
-import { Button, Chip, Pagination as PaginationComponent, Switch } from "@heroui/react";
+import { Button, Chip, Pagination as PaginationComponent, Switch, Tooltip } from "@heroui/react";
 import Link from "next/link";
 import { AgentInfo, getAgentList } from "@/app/actions";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +10,7 @@ import { useEndpointStore } from "@/stores/endpoint";
 import { cn, Input, Spinner } from "@heroui/react";
 import { wrapApiRequest } from "@/utils/api";
 import { getAgentListAPI } from "@/api/rpc";
-import { Search } from "lucide-react";
+import { Search, AlertCircle } from "lucide-react";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import type { Swiper as SwiperType } from 'swiper';
 import { Grid, Navigation, Pagination } from 'swiper/modules';
@@ -109,6 +109,11 @@ export default function AgentList() {
     );
   }, [agentList, search, showMyAgentsOnly, selectedAddress]);
 
+  const hasUnverifiedOwnAgents = useMemo(() => {
+    if (!selectedAddress) return false;
+    return agentList.some((agent) => agent.ownerId === selectedAddress && !agent.urlVerified);
+  }, [agentList, selectedAddress]);
+
   const calculateTotalPages = useMemo(() => {
     if (filteredAgentList.length === 0) return 1;
 
@@ -166,6 +171,11 @@ export default function AgentList() {
                 color="primary"
               />
               <span className="text-sm text-default-600">My</span>
+              {hasUnverifiedOwnAgents && (
+                <Tooltip content="You have unverified Agents, switch to My to view" placement="top">
+                  <AlertCircle className="w-4 h-4 text-warning cursor-help" />
+                </Tooltip>
+              )}
             </div>
           )}
           <div className="flex items-center gap-2">
