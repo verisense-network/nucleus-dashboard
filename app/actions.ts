@@ -4,8 +4,7 @@ import { getNucleusListAPI, getNucleusByIdAPI, getNucleusAbiAPI } from "@/api/nu
 import { getNodeDetailAPI } from "@/api/node";
 import { NucleusListResponse, NucleusInfo } from "@/types/nucleus";
 import { NodeDetail } from "@/types/node";
-import { AgentCard } from "@/types/a2a";
-import { APIResponse } from "@/types/api";
+import { APIResponse, AgentInfo } from "@/types/api";
 import { getAgentByIdAPI, getAgentListAPI, getMcpServerListAPI, getMcpServerByIdAPI } from "@/api/rpc";
 import { McpPrompt, McpResource, McpServer, McpServerCapabilities, McpServerDetails, McpTool } from "@/types/mcp";
 import { createMcpClient, DEFAULT_MCP_CONFIG } from "@/lib/mcp-client";
@@ -118,14 +117,6 @@ export async function getNucleusAbi(rpcUrl: string): Promise<any> {
       message: e.message,
     };
   }
-}
-
-export type AgentInfo = {
-  priceRate?: string;
-  urlVerified: boolean;
-  agentId: string;
-  ownerId: string;
-  agentCard: AgentCard;
 }
 
 export type AgentListResponse = APIResponse<AgentInfo[]>;

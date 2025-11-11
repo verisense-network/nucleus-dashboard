@@ -1,7 +1,7 @@
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import Link from "next/link";
-import { AgentInfo } from "@/app/actions";
+import { AgentInfo } from "@/types/api";
 import { Avatar } from "@heroui/avatar";
 import { ScrollShadow } from "@heroui/react";
 import { CheckCircle, XCircle } from "lucide-react";

@@ -1,9 +1,9 @@
 import { getPolkadotApi } from "@/lib/polkadotApi";
 import { AgentCard } from "@/types/a2a";
+import { AgentInfo } from "@/types/api";
 import { McpServer } from "@/types/mcp";
 import { Id, toast } from "react-toastify";
 import { compressString, decompressString } from "@/utils/compressString";
-import { AgentInfo } from "@/app/actions";
 
 function processDescriptionFromChain(description?: string): string {
   if (description?.startsWith('0x') && description.length > 10) {
@@ -145,13 +145,19 @@ export async function getAgentListAPI(endpoint: string): Promise<AgentInfo[]> {
   const agents = result.toHuman() as unknown as AgentInfo[];
 
   return agents.map(agent => {
+    let processedPriceRate = 0;
+    const rawPriceRate = agent.priceRate as unknown;
+    if (rawPriceRate !== undefined && rawPriceRate !== null) {
+      if (typeof rawPriceRate === 'string') {
+        processedPriceRate = parseInt(rawPriceRate.replace(/,/g, ''), 10) / 100;
+      } else if (typeof rawPriceRate === 'number') {
+        processedPriceRate = rawPriceRate / 100;
+      }
+    }
+
     const processedAgent: AgentInfo = {
       ...agent,
-      priceRate: agent.priceRate ?
-        (typeof agent.priceRate === 'string' ?
-          parseInt(agent.priceRate.replace(/,/g, ''), 10) / 100 :
-          Number(agent.priceRate) / 100).toString() :
-        undefined,
+      priceRate: processedPriceRate,
     };
 
     if (agent.agentCard?.description) {
@@ -167,6 +173,7 @@ export async function getAgentListAPI(endpoint: string): Promise<AgentInfo[]> {
 
 export async function getAgentByIdAPI(endpoint: string, agentId: string): Promise<AgentInfo> {
   const api = await getPolkadotApi(endpoint);
+
   const result = await api.call.a2aRuntimeApi?.findAgent(agentId);
   if (!result) {
     throw new Error('A2A runtime API not available or findAgent method not found');
@@ -174,13 +181,19 @@ export async function getAgentByIdAPI(endpoint: string, agentId: string): Promis
 
   const agent = result.toHuman() as unknown as AgentInfo;
 
+  let processedPriceRate = 0;
+  const rawPriceRate = agent.priceRate as unknown;
+  if (rawPriceRate !== undefined && rawPriceRate !== null) {
+    if (typeof rawPriceRate === 'string') {
+      processedPriceRate = parseInt(rawPriceRate.replace(/,/g, ''), 10) / 100;
+    } else if (typeof rawPriceRate === 'number') {
+      processedPriceRate = rawPriceRate / 100;
+    }
+  }
+
   const processedAgent: AgentInfo = {
     ...agent,
-    priceRate: agent.priceRate ?
-      (typeof agent.priceRate === 'string' ?
-        parseInt(agent.priceRate.replace(/,/g, ''), 10) / 100 :
-        Number(agent.priceRate) / 100).toString() :
-      undefined,
+    priceRate: processedPriceRate,
   };
 
   if (agent.agentCard?.description) {

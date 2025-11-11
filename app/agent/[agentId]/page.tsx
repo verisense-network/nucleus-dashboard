@@ -1,6 +1,6 @@
 "use client";
 
-import { AgentInfo, getAgentById } from "@/app/actions";
+import { getAgentById } from "@/app/actions";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
@@ -21,6 +21,7 @@ import { toast } from "react-toastify";
 import { deleteAgent, getAgentByIdAPI } from "@/api/rpc";
 import { wrapApiRequest } from "@/utils/api";
 import DnsVerificationModal from "@/components/modal/DnsVerificationModal";
+import { AgentInfo } from "@/types/api";
 
 interface AgentDetailPageProps {
   params: Promise<{
