@@ -242,7 +242,7 @@ export default function AgentOnboardPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-3">
                           <Link href={`/agent/${agentId}`}>
                             <Button
                               color="warning"
@@ -252,6 +252,15 @@ export default function AgentOnboardPage() {
                               Back to Agent Details
                             </Button>
                           </Link>
+                          <Button
+                            color="primary"
+                            variant="solid"
+                            onPress={handleOnboard}
+                            isLoading={isOnboarding}
+                            isDisabled={!selectedAccount || isOnboarding}
+                          >
+                            {isOnboarding ? 'Processing...' : 'Resume Verification'}
+                          </Button>
                         </div>
                       </CardBody>
                     </Card>
