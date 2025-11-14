@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { Button, Card, CardBody, CardHeader, Spinner, Chip, Alert } from '@heroui/react';
-import { DollarSign, AlertCircle, CheckCircle, ArrowRight, CheckCircle2, XCircle, Copy } from 'lucide-react';
+import { DollarSign, AlertCircle, CheckCircle, ArrowRight, CheckCircle2, XCircle, Copy, ArrowLeft } from 'lucide-react';
 import { onboardAgent } from '@/api/stripe';
 import { Agent, getAgentById } from '@/api/agents';
 import { usePolkadotWalletStore } from '@/stores/polkadot-wallet';
@@ -181,6 +182,83 @@ export default function AgentOnboardPage() {
                 )}
               </div>
 
+
+
+              {!isLoading && agentData && (
+                <>
+                  {agentData.stripeAccountId && agentData.chargesEnabled && (
+                    <Card className="border-success bg-success-50/50">
+                      <CardBody className="gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 p-2 bg-success rounded-lg">
+                            <CheckCircle className="w-6 h-6" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-lg font-bold mb-1">
+                              Payment Account Active
+                            </h4>
+                            <p className="text-sm text-foreground-700">
+                              Your Stripe account is fully configured and ready to receive payments from users.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <Link href={`/agent/${agentId}`}>
+                            <Button
+                              color="success"
+                              variant="flat"
+                              startContent={<ArrowLeft className="w-4 h-4" />}
+                            >
+                              Back to Agent Details
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  )}
+
+                  {agentData.stripeAccountId && !agentData.chargesEnabled && (
+                    <Card className="border-warning bg-warning-50/50">
+                      <CardBody className="gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 p-2 bg-warning rounded-lg">
+                            <AlertCircle className="w-6 h-6" />
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <h4 className="text-lg font-bold text-warning">
+                              Verification In Progress
+                            </h4>
+                            <p className="text-sm">
+                              Your Stripe account is connected but pending verification. Please complete any outstanding requirements in your Stripe dashboard.
+                            </p>
+                            <div className="mt-3">
+                              <h5 className="text-sm font-semibold mb-2">What&apos;s Next:</h5>
+                              <ul className="text-sm space-y-1 ml-4 list-disc">
+                                <li>Check your Stripe dashboard for pending actions</li>
+                                <li>Complete business information verification</li>
+                                <li>Verify bank account details</li>
+                                <li>Submit any required documents</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <Link href={`/agent/${agentId}`}>
+                            <Button
+                              color="warning"
+                              variant="flat"
+                              startContent={<ArrowLeft className="w-4 h-4" />}
+                            >
+                              Back to Agent Details
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  )}
+                </>
+              )}
+
               {selectedAccount && agentData.ownerId &&
                 agentData.ownerId.toLowerCase() !== selectedAccount.address.toLowerCase() && (
                   <Card className="border-danger bg-danger-50/50">
@@ -225,7 +303,7 @@ export default function AgentOnboardPage() {
             </>
           )}
 
-          {!isLoading && agentData && !apiKey && (
+          {!isLoading && agentData && !apiKey && !agentData.stripeAccountId && (
             <div className="space-y-3">
               <h3 className="font-semibold">Configuration Steps:</h3>
               <div className="space-y-2">
@@ -346,7 +424,7 @@ export default function AgentOnboardPage() {
             />
           )}
 
-          {!apiKey && (
+          {!apiKey && !agentData?.stripeAccountId && (
             <div className="flex gap-3 justify-end pt-4">
               <Button
                 color="primary"
