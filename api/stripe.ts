@@ -20,7 +20,7 @@ export async function onboardAgent(
   request: OnboardAgentRequest
 ): Promise<ApiResponse<OnboardAgentResponse>> {
   try {
-    const response = await fetch(`${SENSESPACE_BACKEND_URL}/api/stripe/onboard`, {
+    const response = await fetch(`${SENSESPACE_BACKEND_URL}/v1/payment/onboard`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
