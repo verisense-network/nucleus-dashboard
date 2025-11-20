@@ -180,9 +180,24 @@ export default function AgentOnboardPage() {
                     </p>
                   </div>
                 )}
+                {agentData.stripeAccountId && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-default-600">Stripe Account ID</h3>
+                      <Chip
+                        color="primary"
+                        variant="flat"
+                        size="sm"
+                      >
+                        Connected
+                      </Chip>
+                    </div>
+                    <p className="text-sm font-mono break-all px-3 py-2 bg-default-100 rounded-lg border border-default-200">
+                      {agentData.stripeAccountId}
+                    </p>
+                  </div>
+                )}
               </div>
-
-
 
               {!isLoading && agentData && (
                 <>
