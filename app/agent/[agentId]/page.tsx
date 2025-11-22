@@ -22,6 +22,7 @@ import { deleteAgent, getAgentByIdAPI } from "@/api/rpc";
 import { wrapApiRequest } from "@/utils/api";
 import DnsVerificationModal from "@/components/modal/DnsVerificationModal";
 import { AgentInfo } from "@/types/api";
+import StripeOnboardButton from "@/components/stripe/StripeOnboardButton";
 
 interface AgentDetailPageProps {
   params: Promise<{
@@ -286,7 +287,7 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
           </div>
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-3 w-full">
+              <div className="flex flex-wrap items-center justify-between gap-3 w-full">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg flex items-center justify-center">
                     <Avatar src={agentCard.iconUrl} />
@@ -316,6 +317,12 @@ export default function AgentDetailPage({ params }: AgentDetailPageProps) {
                   />
                   {agent?.ownerId === selectedAddress && (
                     <>
+                      <StripeOnboardButton
+                        agentId={agentId}
+                        isOnboarded={false}
+                        size="md"
+                        variant="flat"
+                      />
                       <Button color="primary" onPress={() => {
                         router.push(`/register/agent?agentCardId=${agentId}`);
                       }}>
