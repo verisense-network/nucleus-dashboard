@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Card, CardBody, CardHeader, Spinner, Chip, Alert } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, Spinner, Chip, Alert, Select, SelectItem } from '@heroui/react';
 import { DollarSign, AlertCircle, CheckCircle, ArrowRight, CheckCircle2, XCircle, Copy, ArrowLeft } from 'lucide-react';
 import { onboardAgent } from '@/api/stripe';
 import { Agent, getAgentById } from '@/api/agents';
 import { usePolkadotWalletStore } from '@/stores/polkadot-wallet';
 import { web3Enable, web3FromSource } from '@polkadot/extension-dapp';
+import { STRIPE_COUNTRIES } from '@/lib/countries';
 
 export default function AgentOnboardPage() {
   const params = useParams();
@@ -22,6 +23,7 @@ export default function AgentOnboardPage() {
   const [copied, setCopied] = useState(false);
   const [agentData, setAgentData] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -41,6 +43,11 @@ export default function AgentOnboardPage() {
   const handleOnboard = async () => {
     if (!selectedAccount) {
       setError('Please connect your wallet first');
+      return;
+    }
+
+    if (!selectedCountry) {
+      setError('Please select a country or region');
       return;
     }
 
@@ -74,10 +81,13 @@ export default function AgentOnboardPage() {
       });
 
 
-      const response = await onboardAgent({
-        agentId,
-        signature,
-      });
+      const response = await onboardAgent(
+        {
+          agentId,
+          signature,
+        },
+        selectedCountry
+      );
 
       if (!response.success) {
         throw new Error(response.message || 'Failed to onboard agent');
@@ -102,12 +112,6 @@ export default function AgentOnboardPage() {
       navigator.clipboard.writeText(apiKey);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleContinueToStripe = () => {
-    if (stripeUrl) {
-      window.location.href = stripeUrl;
     }
   };
 
@@ -232,53 +236,85 @@ export default function AgentOnboardPage() {
                     </Card>
                   )}
 
-                  {agentData.stripeAccountId && !agentData.chargesEnabled && (
-                    <Card className="border-warning bg-warning-50/50">
-                      <CardBody className="gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 p-2 bg-warning rounded-lg">
-                            <AlertCircle className="w-6 h-6" />
-                          </div>
-                          <div className="flex-1 space-y-2">
-                            <h4 className="text-lg font-bold text-warning">
-                              Verification In Progress
-                            </h4>
-                            <p className="text-sm">
-                              Your Stripe account is connected but pending verification. Please complete any outstanding requirements in your Stripe dashboard.
-                            </p>
-                            <div className="mt-3">
-                              <h5 className="text-sm font-semibold mb-2">What&apos;s Next:</h5>
-                              <ul className="text-sm space-y-1 ml-4 list-disc">
-                                <li>Check your Stripe dashboard for pending actions</li>
-                                <li>Complete business information verification</li>
-                                <li>Verify bank account details</li>
-                                <li>Submit any required documents</li>
-                              </ul>
+                  {!apiKey && agentData.stripeAccountId && !agentData.chargesEnabled && (
+                    <>
+                      <div className="space-y-3">
+                        <h3 className="font-semibold">Select Country</h3>
+                        <Select
+                          label="Country"
+                          placeholder="Choose your country"
+                          selectedKeys={selectedCountry ? [selectedCountry] : []}
+                          onSelectionChange={(keys) => {
+                            const selected = Array.from(keys)[0] as string;
+                            setSelectedCountry(selected);
+                          }}
+                          isRequired
+                          variant="bordered"
+                          classNames={{
+                            trigger: "min-h-12",
+                          }}
+                        >
+                          {STRIPE_COUNTRIES.map((country) => (
+                            <SelectItem
+                              key={country.code}
+                              startContent={
+                                <span className="text-xl" role="img" aria-label={country.name}>
+                                  {country.flag}
+                                </span>
+                              }
+                            >
+                              {country.name}
+                            </SelectItem>
+                          ))}
+                        </Select>
+                      </div>
+                      <Card className="border-warning bg-warning-50/50">
+                        <CardBody className="gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 p-2 bg-warning rounded-lg">
+                              <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <h4 className="text-lg font-bold text-warning">
+                                Verification In Progress
+                              </h4>
+                              <p className="text-sm">
+                                Your Stripe account is connected but pending verification. Please complete any outstanding requirements in your Stripe dashboard.
+                              </p>
+                              <div className="mt-3">
+                                <h5 className="text-sm font-semibold mb-2">What&apos;s Next:</h5>
+                                <ul className="text-sm space-y-1 ml-4 list-disc">
+                                  <li>Check your Stripe dashboard for pending actions</li>
+                                  <li>Complete business information verification</li>
+                                  <li>Verify bank account details</li>
+                                  <li>Submit any required documents</li>
+                                </ul>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex justify-end gap-3">
-                          <Link href={`/agent/${agentId}`}>
+                          <div className="flex justify-end gap-3">
+                            <Link href={`/agent/${agentId}`}>
+                              <Button
+                                color="warning"
+                                variant="flat"
+                                startContent={<ArrowLeft className="w-4 h-4" />}
+                              >
+                                Back to Agent Details
+                              </Button>
+                            </Link>
                             <Button
-                              color="warning"
-                              variant="flat"
-                              startContent={<ArrowLeft className="w-4 h-4" />}
+                              color="primary"
+                              variant="solid"
+                              onPress={handleOnboard}
+                              isLoading={isOnboarding}
+                              isDisabled={!selectedAccount || !selectedCountry || isOnboarding}
                             >
-                              Back to Agent Details
+                              {isOnboarding ? 'Processing...' : 'Resume Verification'}
                             </Button>
-                          </Link>
-                          <Button
-                            color="primary"
-                            variant="solid"
-                            onPress={handleOnboard}
-                            isLoading={isOnboarding}
-                            isDisabled={!selectedAccount || isOnboarding}
-                          >
-                            {isOnboarding ? 'Processing...' : 'Resume Verification'}
-                          </Button>
-                        </div>
-                      </CardBody>
-                    </Card>
+                          </div>
+                        </CardBody>
+                      </Card>
+                    </>
                   )}
                 </>
               )}
@@ -328,55 +364,88 @@ export default function AgentOnboardPage() {
           )}
 
           {!isLoading && agentData && !apiKey && !agentData.stripeAccountId && (
-            <div className="space-y-3">
-              <h3 className="font-semibold">Configuration Steps:</h3>
-              <div className="space-y-2">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
-                    1
+            <>
+              <div className="space-y-3">
+                <h3 className="font-semibold">Select Country</h3>
+                <Select
+                  label="Country"
+                  placeholder="Choose your country"
+                  selectedKeys={selectedCountry ? [selectedCountry] : []}
+                  onSelectionChange={(keys) => {
+                    const selected = Array.from(keys)[0] as string;
+                    setSelectedCountry(selected);
+                  }}
+                  isRequired
+                  variant="bordered"
+                  classNames={{
+                    trigger: "min-h-12",
+                  }}
+                >
+                  {STRIPE_COUNTRIES.map((country) => (
+                    <SelectItem
+                      key={country.code}
+                      startContent={
+                        <span className="text-xl" role="img" aria-label={country.name}>
+                          {country.flag}
+                        </span>
+                      }
+                    >
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold">Configuration Steps:</h3>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
+                      1
+                    </div>
+                    <div>
+                      <p className="font-medium">Wallet Signature Verification</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Confirm you are the owner of this agent
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">Wallet Signature Verification</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Confirm you are the owner of this agent
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-warning flex items-center justify-center text-white text-xs flex-shrink-0">
+                      2
+                    </div>
+                    <div>
+                      <p className="font-medium text-warning-700 dark:text-warning-400">⚠️ Save API Key (Shown only once!)</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        This is your payment credential needed when users pay
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-warning flex items-center justify-center text-white text-xs flex-shrink-0">
-                    2
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
+                      3
+                    </div>
+                    <div>
+                      <p className="font-medium">Complete Stripe Account Setup</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Provide business information and bank account details
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-warning-700 dark:text-warning-400">⚠️ Save API Key (Shown only once!)</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      This is your payment credential needed when users pay
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
-                    3
-                  </div>
-                  <div>
-                    <p className="font-medium">Complete Stripe Account Setup</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Provide business information and bank account details
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center text-white text-xs flex-shrink-0">
-                    ✓
-                  </div>
-                  <div>
-                    <p className="font-medium text-success-700 dark:text-success-400">Start Receiving Payments</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Your agent can charge users, funds automatically transfer to your account
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center text-white text-xs flex-shrink-0">
+                      ✓
+                    </div>
+                    <div>
+                      <p className="font-medium text-success-700 dark:text-success-400">Start Receiving Payments</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Your agent can charge users, funds automatically transfer to your account
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {apiKey && (
@@ -426,10 +495,12 @@ export default function AgentOnboardPage() {
                 </div>
 
                 <Button
+                  as={Link}
                   color="primary"
                   size="lg"
+                  href={stripeUrl || ''}
+                  target="_blank"
                   endContent={<ArrowRight className="w-5 h-5" />}
-                  onPress={handleContinueToStripe}
                   className="w-full"
                   isDisabled={!stripeUrl}
                 >
@@ -458,6 +529,7 @@ export default function AgentOnboardPage() {
                 isDisabled={
                   isLoading ||
                   !selectedAccount ||
+                  !selectedCountry ||
                   isOnboarding ||
                   !agentData ||
                   Boolean(agentData?.ownerId &&

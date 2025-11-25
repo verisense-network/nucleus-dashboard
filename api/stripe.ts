@@ -17,10 +17,11 @@ export interface ApiResponse<T> {
 }
 
 export async function onboardAgent(
-  request: OnboardAgentRequest
+  request: OnboardAgentRequest,
+  country: string
 ): Promise<ApiResponse<OnboardAgentResponse>> {
   try {
-    const response = await fetch(`${SENSESPACE_BACKEND_URL}/v1/payment/onboard`, {
+    const response = await fetch(`${SENSESPACE_BACKEND_URL}/v1/payment/onboard?country=${country}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
