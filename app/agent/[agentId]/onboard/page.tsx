@@ -81,11 +81,13 @@ export default function AgentOnboardPage() {
       });
 
 
-      const response = await onboardAgent({
-        agentId,
-        signature,
-        country: selectedCountry,
-      });
+      const response = await onboardAgent(
+        {
+          agentId,
+          signature,
+        },
+        selectedCountry
+      );
 
       if (!response.success) {
         throw new Error(response.message || 'Failed to onboard agent');
@@ -110,12 +112,6 @@ export default function AgentOnboardPage() {
       navigator.clipboard.writeText(apiKey);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleContinueToStripe = () => {
-    if (stripeUrl) {
-      window.location.href = stripeUrl;
     }
   };
 
@@ -240,53 +236,85 @@ export default function AgentOnboardPage() {
                     </Card>
                   )}
 
-                  {agentData.stripeAccountId && !agentData.chargesEnabled && (
-                    <Card className="border-warning bg-warning-50/50">
-                      <CardBody className="gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 p-2 bg-warning rounded-lg">
-                            <AlertCircle className="w-6 h-6" />
-                          </div>
-                          <div className="flex-1 space-y-2">
-                            <h4 className="text-lg font-bold text-warning">
-                              Verification In Progress
-                            </h4>
-                            <p className="text-sm">
-                              Your Stripe account is connected but pending verification. Please complete any outstanding requirements in your Stripe dashboard.
-                            </p>
-                            <div className="mt-3">
-                              <h5 className="text-sm font-semibold mb-2">What&apos;s Next:</h5>
-                              <ul className="text-sm space-y-1 ml-4 list-disc">
-                                <li>Check your Stripe dashboard for pending actions</li>
-                                <li>Complete business information verification</li>
-                                <li>Verify bank account details</li>
-                                <li>Submit any required documents</li>
-                              </ul>
+                  {!apiKey && agentData.stripeAccountId && !agentData.chargesEnabled && (
+                    <>
+                      <div className="space-y-3">
+                        <h3 className="font-semibold">Select Country</h3>
+                        <Select
+                          label="Country"
+                          placeholder="Choose your country"
+                          selectedKeys={selectedCountry ? [selectedCountry] : []}
+                          onSelectionChange={(keys) => {
+                            const selected = Array.from(keys)[0] as string;
+                            setSelectedCountry(selected);
+                          }}
+                          isRequired
+                          variant="bordered"
+                          classNames={{
+                            trigger: "min-h-12",
+                          }}
+                        >
+                          {STRIPE_COUNTRIES.map((country) => (
+                            <SelectItem
+                              key={country.code}
+                              startContent={
+                                <span className="text-xl" role="img" aria-label={country.name}>
+                                  {country.flag}
+                                </span>
+                              }
+                            >
+                              {country.name}
+                            </SelectItem>
+                          ))}
+                        </Select>
+                      </div>
+                      <Card className="border-warning bg-warning-50/50">
+                        <CardBody className="gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 p-2 bg-warning rounded-lg">
+                              <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <h4 className="text-lg font-bold text-warning">
+                                Verification In Progress
+                              </h4>
+                              <p className="text-sm">
+                                Your Stripe account is connected but pending verification. Please complete any outstanding requirements in your Stripe dashboard.
+                              </p>
+                              <div className="mt-3">
+                                <h5 className="text-sm font-semibold mb-2">What&apos;s Next:</h5>
+                                <ul className="text-sm space-y-1 ml-4 list-disc">
+                                  <li>Check your Stripe dashboard for pending actions</li>
+                                  <li>Complete business information verification</li>
+                                  <li>Verify bank account details</li>
+                                  <li>Submit any required documents</li>
+                                </ul>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex justify-end gap-3">
-                          <Link href={`/agent/${agentId}`}>
+                          <div className="flex justify-end gap-3">
+                            <Link href={`/agent/${agentId}`}>
+                              <Button
+                                color="warning"
+                                variant="flat"
+                                startContent={<ArrowLeft className="w-4 h-4" />}
+                              >
+                                Back to Agent Details
+                              </Button>
+                            </Link>
                             <Button
-                              color="warning"
-                              variant="flat"
-                              startContent={<ArrowLeft className="w-4 h-4" />}
+                              color="primary"
+                              variant="solid"
+                              onPress={handleOnboard}
+                              isLoading={isOnboarding}
+                              isDisabled={!selectedAccount || !selectedCountry || isOnboarding}
                             >
-                              Back to Agent Details
+                              {isOnboarding ? 'Processing...' : 'Resume Verification'}
                             </Button>
-                          </Link>
-                          <Button
-                            color="primary"
-                            variant="solid"
-                            onPress={handleOnboard}
-                            isLoading={isOnboarding}
-                            isDisabled={!selectedAccount || isOnboarding}
-                          >
-                            {isOnboarding ? 'Processing...' : 'Resume Verification'}
-                          </Button>
-                        </div>
-                      </CardBody>
-                    </Card>
+                          </div>
+                        </CardBody>
+                      </Card>
+                    </>
                   )}
                 </>
               )}
@@ -467,10 +495,12 @@ export default function AgentOnboardPage() {
                 </div>
 
                 <Button
+                  as={Link}
                   color="primary"
                   size="lg"
+                  href={stripeUrl || ''}
+                  target="_blank"
                   endContent={<ArrowRight className="w-5 h-5" />}
-                  onPress={handleContinueToStripe}
                   className="w-full"
                   isDisabled={!stripeUrl}
                 >
