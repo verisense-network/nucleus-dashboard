@@ -3,6 +3,7 @@ const SENSESPACE_BACKEND_URL = process.env.NEXT_PUBLIC_SENSESPACE_BACKEND_URL ||
 export interface OnboardAgentRequest {
   agentId: string;
   signature: string;
+  country: string;
 }
 
 export interface OnboardAgentResponse {
@@ -20,7 +21,7 @@ export async function onboardAgent(
   request: OnboardAgentRequest
 ): Promise<ApiResponse<OnboardAgentResponse>> {
   try {
-    const response = await fetch(`${SENSESPACE_BACKEND_URL}/v1/payment/onboard`, {
+    const response = await fetch(`${SENSESPACE_BACKEND_URL}/v1/payment/onboard?country=${request.country}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

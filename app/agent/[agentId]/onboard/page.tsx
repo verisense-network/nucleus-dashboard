@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Card, CardBody, CardHeader, Spinner, Chip, Alert } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, Spinner, Chip, Alert, Select, SelectItem } from '@heroui/react';
 import { DollarSign, AlertCircle, CheckCircle, ArrowRight, CheckCircle2, XCircle, Copy, ArrowLeft } from 'lucide-react';
 import { onboardAgent } from '@/api/stripe';
 import { Agent, getAgentById } from '@/api/agents';
 import { usePolkadotWalletStore } from '@/stores/polkadot-wallet';
 import { web3Enable, web3FromSource } from '@polkadot/extension-dapp';
+import { STRIPE_COUNTRIES } from '@/lib/countries';
 
 export default function AgentOnboardPage() {
   const params = useParams();
@@ -22,6 +23,7 @@ export default function AgentOnboardPage() {
   const [copied, setCopied] = useState(false);
   const [agentData, setAgentData] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -41,6 +43,11 @@ export default function AgentOnboardPage() {
   const handleOnboard = async () => {
     if (!selectedAccount) {
       setError('Please connect your wallet first');
+      return;
+    }
+
+    if (!selectedCountry) {
+      setError('Please select a country or region');
       return;
     }
 
@@ -77,6 +84,7 @@ export default function AgentOnboardPage() {
       const response = await onboardAgent({
         agentId,
         signature,
+        country: selectedCountry,
       });
 
       if (!response.success) {
@@ -328,55 +336,88 @@ export default function AgentOnboardPage() {
           )}
 
           {!isLoading && agentData && !apiKey && !agentData.stripeAccountId && (
-            <div className="space-y-3">
-              <h3 className="font-semibold">Configuration Steps:</h3>
-              <div className="space-y-2">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
-                    1
+            <>
+              <div className="space-y-3">
+                <h3 className="font-semibold">Select Country</h3>
+                <Select
+                  label="Country"
+                  placeholder="Choose your country"
+                  selectedKeys={selectedCountry ? [selectedCountry] : []}
+                  onSelectionChange={(keys) => {
+                    const selected = Array.from(keys)[0] as string;
+                    setSelectedCountry(selected);
+                  }}
+                  isRequired
+                  variant="bordered"
+                  classNames={{
+                    trigger: "min-h-12",
+                  }}
+                >
+                  {STRIPE_COUNTRIES.map((country) => (
+                    <SelectItem
+                      key={country.code}
+                      startContent={
+                        <span className="text-xl" role="img" aria-label={country.name}>
+                          {country.flag}
+                        </span>
+                      }
+                    >
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold">Configuration Steps:</h3>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
+                      1
+                    </div>
+                    <div>
+                      <p className="font-medium">Wallet Signature Verification</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Confirm you are the owner of this agent
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">Wallet Signature Verification</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Confirm you are the owner of this agent
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-warning flex items-center justify-center text-white text-xs flex-shrink-0">
+                      2
+                    </div>
+                    <div>
+                      <p className="font-medium text-warning-700 dark:text-warning-400">⚠️ Save API Key (Shown only once!)</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        This is your payment credential needed when users pay
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-warning flex items-center justify-center text-white text-xs flex-shrink-0">
-                    2
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
+                      3
+                    </div>
+                    <div>
+                      <p className="font-medium">Complete Stripe Account Setup</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Provide business information and bank account details
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-warning-700 dark:text-warning-400">⚠️ Save API Key (Shown only once!)</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      This is your payment credential needed when users pay
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs flex-shrink-0">
-                    3
-                  </div>
-                  <div>
-                    <p className="font-medium">Complete Stripe Account Setup</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Provide business information and bank account details
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center text-white text-xs flex-shrink-0">
-                    ✓
-                  </div>
-                  <div>
-                    <p className="font-medium text-success-700 dark:text-success-400">Start Receiving Payments</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Your agent can charge users, funds automatically transfer to your account
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center text-white text-xs flex-shrink-0">
+                      ✓
+                    </div>
+                    <div>
+                      <p className="font-medium text-success-700 dark:text-success-400">Start Receiving Payments</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Your agent can charge users, funds automatically transfer to your account
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {apiKey && (
@@ -458,6 +499,7 @@ export default function AgentOnboardPage() {
                 isDisabled={
                   isLoading ||
                   !selectedAccount ||
+                  !selectedCountry ||
                   isOnboarding ||
                   !agentData ||
                   Boolean(agentData?.ownerId &&
