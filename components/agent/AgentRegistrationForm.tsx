@@ -289,25 +289,25 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       const parsedData = JSON.parse(input || jsonInput);
 
       if (!parsedData || typeof parsedData !== 'object') {
-        throw new Error('Invalid JSON format');
+        throw new Error('Invalid JSON format: Root must be an object');
       }
 
       const formData: Partial<FormData> = {
         ...parsedData,
         securitySchemesArray: parsedData.securitySchemes
           ? Object.entries(parsedData.securitySchemes).map(([schemeName, scheme]) => {
-            const parsedScheme = JSON.parse(scheme as string);
+            const parsedScheme = typeof scheme === 'string' ? JSON.parse(scheme) : scheme;
 
             // Convert scopes object to array for OAuth2
             if (parsedScheme.type === 'oauth2' && parsedScheme.flows) {
-              const processedFlows: any = {};
+              const processedFlows: Record<string, unknown> = {};
 
-              Object.entries(parsedScheme.flows).forEach(([flowType, flowConfig]: [string, any]) => {
+              Object.entries(parsedScheme.flows).forEach(([flowType, flowConfig]) => {
                 if (flowConfig && typeof flowConfig === 'object') {
-                  const processedFlow = { ...flowConfig };
+                  const processedFlow = { ...(flowConfig as object) } as Record<string, unknown>;
 
-                  if (flowConfig.scopes && typeof flowConfig.scopes === 'object') {
-                    const scopesArray = Object.entries(flowConfig.scopes).map(([name, description]) => ({
+                  if (processedFlow.scopes && typeof processedFlow.scopes === 'object') {
+                    const scopesArray = Object.entries(processedFlow.scopes as Record<string, string>).map(([name, description]) => ({
                       name,
                       description: description as string,
                     }));
@@ -334,7 +334,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
           })
           : [],
         securityArray: parsedData.security
-          ? parsedData.security.flatMap((requirement: any) =>
+          ? parsedData.security.flatMap((requirement: Record<string, string[]>) =>
             Object.entries(requirement).map(([schemeName, scopes]) => ({
               schemeName,
               scopes: Array.isArray(scopes) ? scopes : [],
@@ -343,7 +343,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
           : [],
         capabilities: {
           ...parsedData.capabilities,
-          extensions: parsedData.capabilities?.extensions?.map((extension: any) => ({
+          extensions: parsedData.capabilities?.extensions?.map((extension: { params: string | object }) => ({
             ...extension,
             params: typeof extension.params === 'string' ? JSON.parse(extension.params) : extension.params
           }))
@@ -352,8 +352,13 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
 
       reset(formData);
       setJsonInput('');
+      setIsOpenForm(true);
+      toast.success('Agent Card parsed successfully');
     } catch (error) {
-      setJsonError(error instanceof Error ? error.message : 'Invalid JSON format');
+      console.error('Error parsing JSON:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Invalid JSON format';
+      setJsonError(errorMessage);
+      toast.error(`Failed to parse Agent Card: ${errorMessage}`);
     }
   }, [jsonInput, reset]);
 
@@ -479,7 +484,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                 onChange={(e) => setEndpointUrl(e.target.value)}
                 isInvalid={!!endpointUrlError}
                 errorMessage={endpointUrlError}
-                description="Enter the base URL of the Agent server, the system will automatically load /.well-known/agent.json"
+                description="Enter the base URL of the Agent server (auto loads /.well-known/agent.json) or a direct .json URL"
               />
               <Button
                 color="primary"
@@ -1221,7 +1226,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                       <Controller
                         name={`capabilities.extensions.${index}.params`}
                         control={control}
-                        render={({ field }) => (
+                        render={({ field: _field }) => (
                           <KeyValueInput
                             name={`capabilities.extensions.${index}.params`}
                             control={control}
