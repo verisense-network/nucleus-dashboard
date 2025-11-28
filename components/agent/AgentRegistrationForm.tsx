@@ -637,7 +637,7 @@ export const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
                 rules={{
                   required: 'Agent URL is required',
                   pattern: {
-                    value: /^https?:\/\/.+/,
+                    value: /^https:\/\/.+/,
                     message: 'Please enter a valid URL'
                   }
                 }}
