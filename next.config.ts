@@ -3,15 +3,12 @@ import type { NextConfig } from "next";
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
-  images: {
-    domains: ["storage.googleapis.com"],
-  },
+  reactCompiler: true,
   experimental: {
     useWasmBinary: true,
-    serverActions: {
-      allowedOrigins: [],
-    },
   },
+  trailingSlash: false,
+  skipTrailingSlashRedirect: true,
   compiler: isProd
     ? {
       removeConsole: {
