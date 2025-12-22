@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button, Card, CardBody, CardHeader, Spinner, Chip, Alert, Select, SelectItem } from '@heroui/react';
 import { DollarSign, AlertCircle, CheckCircle, ArrowRight, CheckCircle2, XCircle, Copy, ArrowLeft } from 'lucide-react';
 import { onboardAgent } from '@/api/stripe';
-import { Agent, getAgentById } from '@/api/agents';
+import { Agent, getAgentById, getAgentAuditStatus, AgentAuditInfo, requestAgentAudit } from '@/api/agents';
 import { usePolkadotWalletStore } from '@/stores/polkadot-wallet';
 import { web3Enable, web3FromSource } from '@polkadot/extension-dapp';
 import { STRIPE_COUNTRIES } from '@/lib/countries';
@@ -22,8 +22,10 @@ export default function AgentOnboardPage() {
   const [stripeUrl, setStripeUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [agentData, setAgentData] = useState<Agent | null>(null);
+  const [auditInfo, setAuditInfo] = useState<AgentAuditInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [isRequestingAudit, setIsRequestingAudit] = useState(false);
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -31,6 +33,11 @@ export default function AgentOnboardPage() {
       const response = await getAgentById(agentId);
       if (response.success && response.data) {
         setAgentData(response.data);
+        // Fetch audit status
+        const auditResponse = await getAgentAuditStatus(agentId);
+        if (auditResponse.success && auditResponse.data) {
+          setAuditInfo(auditResponse.data);
+        }
       } else {
         setError(response.message || 'Failed to load agent information');
       }
@@ -113,6 +120,82 @@ export default function AgentOnboardPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleRequestAudit = async () => {
+    if (!selectedAccount) {
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    if (agentData?.ownerId &&
+      agentData?.ownerId.toLowerCase() !== selectedAccount.address.toLowerCase()) {
+      setError('The connected wallet does not own this agent. Please connect with the correct wallet.');
+      return;
+    }
+
+    if (!auditInfo?.onboardComplete) {
+      setError('Please complete Stripe onboarding first');
+      return;
+    }
+
+    setIsRequestingAudit(true);
+    setError(null);
+
+    try {
+      const extensions = await web3Enable('Nucleus Dashboard');
+      if (extensions.length === 0) {
+        throw new Error('No Polkadot extension found. Please install Polkadot.js extension.');
+      }
+
+      const message = `Request audit for agent ${agentId}`;
+      const injector = await web3FromSource(selectedAccount.meta.source);
+
+      if (!injector.signer.signRaw) {
+        throw new Error('Signing not supported by this wallet');
+      }
+
+      const { signature } = await injector.signer.signRaw({
+        address: selectedAccount.address,
+        data: message,
+        type: 'bytes',
+      });
+
+      const response = await requestAgentAudit(agentId, signature);
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to request audit');
+      }
+
+      // Refresh audit info after successful submission
+      const auditResponse = await getAgentAuditStatus(agentId);
+      if (auditResponse.success && auditResponse.data) {
+        setAuditInfo(auditResponse.data);
+      }
+
+      // Also refresh agent data to get updated auditStatus
+      const agentResponse = await getAgentById(agentId);
+      if (agentResponse.success && agentResponse.data) {
+        setAgentData(agentResponse.data);
+      }
+
+      setIsRequestingAudit(false);
+    } catch (err) {
+      console.error('Request audit error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to request audit');
+      setIsRequestingAudit(false);
+    }
+  };
+
+  // Helper function to determine if audit request button should be shown
+  const canRequestAudit = () => {
+    if (!auditInfo || !agentData) return false;
+
+    // Can request audit only when:
+    // 1. Stripe onboarded (onboardComplete = true)
+    // 2. Audit status is NoAudit or Rejected
+    return auditInfo.onboardComplete &&
+      (agentData.auditStatus === 'NoAudit' || agentData.auditStatus === 'Rejected');
   };
 
   useEffect(() => {
@@ -205,7 +288,7 @@ export default function AgentOnboardPage() {
 
               {!isLoading && agentData && (
                 <>
-                  {agentData.stripeAccountId && agentData.chargesEnabled && (
+                  {agentData.stripeAccountId && agentData.auditStatus === 'Accepted' && (
                     <Card className="border-success bg-success-50/50">
                       <CardBody className="gap-3">
                         <div className="flex items-start gap-3">
@@ -236,7 +319,7 @@ export default function AgentOnboardPage() {
                     </Card>
                   )}
 
-                  {!apiKey && agentData.stripeAccountId && !agentData.chargesEnabled && (
+                  {!apiKey && agentData.stripeAccountId && agentData.auditStatus !== 'Accepted' && (
                     <>
                       <div className="space-y-3">
                         <h3 className="font-semibold">Select Country</h3>
@@ -268,52 +351,168 @@ export default function AgentOnboardPage() {
                           ))}
                         </Select>
                       </div>
-                      <Card className="border-warning bg-warning-50/50">
-                        <CardBody className="gap-3">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 p-2 bg-warning rounded-lg">
-                              <AlertCircle className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1 space-y-2">
-                              <h4 className="text-lg font-bold text-warning">
-                                Verification In Progress
-                              </h4>
-                              <p className="text-sm">
-                                Your Stripe account is connected but pending verification. Please complete any outstanding requirements in your Stripe dashboard.
-                              </p>
-                              <div className="mt-3">
-                                <h5 className="text-sm font-semibold mb-2">What&apos;s Next:</h5>
-                                <ul className="text-sm space-y-1 ml-4 list-disc">
-                                  <li>Check your Stripe dashboard for pending actions</li>
-                                  <li>Complete business information verification</li>
-                                  <li>Verify bank account details</li>
-                                  <li>Submit any required documents</li>
-                                </ul>
+                      {agentData.auditStatus === 'Auditing' && (
+                        <Card className="border-info bg-info-50/50">
+                          <CardBody className="gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 p-2 bg-info rounded-lg">
+                                <AlertCircle className="w-6 h-6" />
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <h4 className="text-lg font-bold text-info">
+                                  Under Review
+                                </h4>
+                                <p className="text-sm">
+                                  Your agent is currently under review. Once approved, you can start accepting payments from users.
+                                </p>
+                                {auditInfo && !auditInfo.onboardComplete && (
+                                  <div className="mt-3">
+                                    <h5 className="text-sm font-semibold mb-2">Note:</h5>
+                                    <p className="text-sm">Please ensure you complete all verification steps in your Stripe account.</p>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                          <div className="flex justify-end gap-3">
-                            <Link href={`/agent/${agentId}`}>
+                            <div className="flex justify-end gap-3">
+                              <Link href={`/agent/${agentId}`}>
+                                <Button
+                                  color="default"
+                                  variant="flat"
+                                  startContent={<ArrowLeft className="w-4 h-4" />}
+                                >
+                                  Back to Agent Details
+                                </Button>
+                              </Link>
+                            </div>
+                          </CardBody>
+                        </Card>
+                      )}
+                      {agentData.auditStatus === 'Rejected' && auditInfo?.onboardComplete && (
+                        <Card className="border-danger bg-danger-50/50">
+                          <CardBody className="gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 p-2 bg-danger rounded-lg">
+                                <XCircle className="w-6 h-6" />
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <h4 className="text-lg font-bold text-danger">
+                                  Audit Rejected
+                                </h4>
+                                <p className="text-sm">
+                                  Your payment account audit was not approved. You can modify the information and resubmit your audit request.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-3">
+                              <Link href={`/agent/${agentId}`}>
+                                <Button
+                                  color="danger"
+                                  variant="flat"
+                                  startContent={<ArrowLeft className="w-4 h-4" />}
+                                >
+                                  Back to Agent Details
+                                </Button>
+                              </Link>
                               <Button
-                                color="warning"
-                                variant="flat"
-                                startContent={<ArrowLeft className="w-4 h-4" />}
+                                color="primary"
+                                variant="solid"
+                                onPress={handleRequestAudit}
+                                isLoading={isRequestingAudit}
+                                isDisabled={!selectedAccount || isRequestingAudit}
                               >
-                                Back to Agent Details
+                                {isRequestingAudit ? 'Resubmitting...' : 'Resubmit Audit'}
                               </Button>
-                            </Link>
-                            <Button
-                              color="primary"
-                              variant="solid"
-                              onPress={handleOnboard}
-                              isLoading={isOnboarding}
-                              isDisabled={!selectedAccount || !selectedCountry || isOnboarding}
-                            >
-                              {isOnboarding ? 'Processing...' : 'Resume Verification'}
-                            </Button>
-                          </div>
-                        </CardBody>
-                      </Card>
+                            </div>
+                          </CardBody>
+                        </Card>
+                      )}
+                      {agentData.auditStatus === 'NoAudit' && auditInfo?.onboardComplete && (
+                        <Card className="border-success bg-success-50/50">
+                          <CardBody className="gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 p-2 bg-success rounded-lg">
+                                <CheckCircle className="w-6 h-6" />
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <h4 className="text-lg font-bold text-success">
+                                  Stripe Setup Complete
+                                </h4>
+                                <p className="text-sm">
+                                  You have completed your Stripe account setup and all verifications have passed. Please click the button below to submit your audit request. Once approved, you can start accepting payments from users.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-3">
+                              <Link href={`/agent/${agentId}`}>
+                                <Button
+                                  color="default"
+                                  variant="flat"
+                                  startContent={<ArrowLeft className="w-4 h-4" />}
+                                >
+                                  Back to Agent Details
+                                </Button>
+                              </Link>
+                              <Button
+                                color="primary"
+                                variant="solid"
+                                onPress={handleRequestAudit}
+                                isLoading={isRequestingAudit}
+                                isDisabled={!selectedAccount || isRequestingAudit}
+                              >
+                                {isRequestingAudit ? 'Submitting...' : 'Submit Audit'}
+                              </Button>
+                            </div>
+                          </CardBody>
+                        </Card>
+                      )}
+                      {(!auditInfo?.onboardComplete || agentData.auditStatus === 'NoAudit') && !auditInfo?.onboardComplete && (
+                        <Card className="border-warning bg-warning-50/50">
+                          <CardBody className="gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 p-2 bg-warning rounded-lg">
+                                <AlertCircle className="w-6 h-6" />
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <h4 className="text-lg font-bold text-warning">
+                                  Verification In Progress
+                                </h4>
+                                <p className="text-sm">
+                                  Your Stripe account is connected but pending verification. Please complete any outstanding requirements in your Stripe dashboard.
+                                </p>
+                                <div className="mt-3">
+                                  <h5 className="text-sm font-semibold mb-2">What&apos;s Next:</h5>
+                                  <ul className="text-sm space-y-1 ml-4 list-disc">
+                                    <li>Check your Stripe dashboard for pending actions</li>
+                                    <li>Complete business information verification</li>
+                                    <li>Verify bank account details</li>
+                                    <li>Submit any required documents</li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-3">
+                              <Link href={`/agent/${agentId}`}>
+                                <Button
+                                  color="warning"
+                                  variant="flat"
+                                  startContent={<ArrowLeft className="w-4 h-4" />}
+                                >
+                                  Back to Agent Details
+                                </Button>
+                              </Link>
+                              <Button
+                                color="primary"
+                                variant="solid"
+                                onPress={handleOnboard}
+                                isLoading={isOnboarding}
+                                isDisabled={!selectedAccount || !selectedCountry || isOnboarding}
+                              >
+                                {isOnboarding ? 'Processing...' : 'Resume Verification'}
+                              </Button>
+                            </div>
+                          </CardBody>
+                        </Card>
+                      )}
                     </>
                   )}
                 </>
