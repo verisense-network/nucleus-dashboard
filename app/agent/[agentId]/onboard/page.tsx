@@ -321,36 +321,39 @@ export default function AgentOnboardPage() {
 
                   {!apiKey && agentData.stripeAccountId && agentData.auditStatus !== 'Accepted' && (
                     <>
-                      <div className="space-y-3">
-                        <h3 className="font-semibold">Select Country</h3>
-                        <Select
-                          label="Country"
-                          placeholder="Choose your country"
-                          selectedKeys={selectedCountry ? [selectedCountry] : []}
-                          onSelectionChange={(keys) => {
-                            const selected = Array.from(keys)[0] as string;
-                            setSelectedCountry(selected);
-                          }}
-                          isRequired
-                          variant="bordered"
-                          classNames={{
-                            trigger: "min-h-12",
-                          }}
-                        >
-                          {STRIPE_COUNTRIES.map((country) => (
-                            <SelectItem
-                              key={country.code}
-                              startContent={
-                                <span className="text-xl" role="img" aria-label={country.name}>
-                                  {country.flag}
-                                </span>
-                              }
-                            >
-                              {country.name}
-                            </SelectItem>
-                          ))}
-                        </Select>
-                      </div>
+                      {/* Only show country selector when Stripe onboarding is not complete */}
+                      {!auditInfo?.onboardComplete && (
+                        <div className="space-y-3">
+                          <h3 className="font-semibold">Select Country</h3>
+                          <Select
+                            label="Country"
+                            placeholder="Choose your country"
+                            selectedKeys={selectedCountry ? [selectedCountry] : []}
+                            onSelectionChange={(keys) => {
+                              const selected = Array.from(keys)[0] as string;
+                              setSelectedCountry(selected);
+                            }}
+                            isRequired
+                            variant="bordered"
+                            classNames={{
+                              trigger: "min-h-12",
+                            }}
+                          >
+                            {STRIPE_COUNTRIES.map((country) => (
+                              <SelectItem
+                                key={country.code}
+                                startContent={
+                                  <span className="text-xl" role="img" aria-label={country.name}>
+                                    {country.flag}
+                                  </span>
+                                }
+                              >
+                                {country.name}
+                              </SelectItem>
+                            ))}
+                          </Select>
+                        </div>
+                      )}
                       {agentData.auditStatus === 'Auditing' && (
                         <Card className="border-info bg-info-50/50">
                           <CardBody className="gap-3">
