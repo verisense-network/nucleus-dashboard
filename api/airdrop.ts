@@ -15,7 +15,7 @@ export interface UpdateTaskResponse {
 	data?: unknown;
 }
 
-const TASK_UPDATE_ENDPOINT = "/api/airdrop/tasks/update";
+const TASK_UPDATE_ENDPOINT = "/v1/airdrop/tasks/update";
 
 export interface TaskUpdateResult {
 	success: boolean;
