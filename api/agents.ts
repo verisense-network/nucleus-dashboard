@@ -38,7 +38,7 @@ export interface ApiResponse<T> {
 export async function getAgentById(nucleusId: string): Promise<ApiResponse<Agent>> {
   try {
     const response = await fetch(
-      `${SENSESPACE_BACKEND_URL}/api/agents?nucleus_id=${encodeURIComponent(nucleusId)}`,
+      `${SENSESPACE_BACKEND_URL}/v1/agents?nucleus_id=${encodeURIComponent(nucleusId)}`,
       {
         method: 'GET',
         headers: {
@@ -73,7 +73,7 @@ export async function getAgentById(nucleusId: string): Promise<ApiResponse<Agent
 export async function getAgentAuditStatus(nucleusId: string): Promise<ApiResponse<AgentAuditInfo>> {
   try {
     const response = await fetch(
-      `${SENSESPACE_BACKEND_URL}/api/agents/agent-status/${encodeURIComponent(nucleusId)}`,
+      `${SENSESPACE_BACKEND_URL}/v1/agents/agent-status/${encodeURIComponent(nucleusId)}`,
       {
         method: 'POST',
         headers: {
@@ -116,7 +116,7 @@ export async function requestAgentAudit(
 ): Promise<ApiResponse<string>> {
   try {
     const response = await fetch(
-      `${SENSESPACE_BACKEND_URL}/api/agents/audit/${encodeURIComponent(nucleusId)}`,
+      `${SENSESPACE_BACKEND_URL}/v1/agents/audit/${encodeURIComponent(nucleusId)}`,
       {
         method: 'POST',
         headers: {
